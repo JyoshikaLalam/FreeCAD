@@ -34,8 +34,9 @@
 # endif
 
 # include <algorithm>
-# include <cfloat>
 # include <cmath>
+# include <limits>
+# include <numbers>
 # include <QFontMetrics>
 # include <QPainter>
 
@@ -46,6 +47,8 @@
 # include <Inventor/elements/SoViewVolumeElement.h>
 # include <Inventor/misc/SoState.h>
 #endif // _PreComp_
+
+#include <Base/Tools.h>
 
 #include <Gui/BitmapFactory.h>
 #include <Gui/Tools.h>
@@ -58,6 +61,59 @@ constexpr const float ZCONSTR {0.006F};
 using namespace Gui;
 
 // ------------------------------------------------------
+
+
+namespace {
+
+void glVertex(const SbVec3f& pt){
+    glVertex3f(pt[0], pt[1], pt[2]);
+}
+
+void glVertexes(const std::vector<SbVec3f>& pts){
+    for (auto pt: pts){
+        glVertex3f(pt[0], pt[1], pt[2]);
+    }
+}
+
+void glDrawLine(const SbVec3f& p1, const SbVec3f& p2){
+    glBegin(GL_LINES);
+        glVertexes({p1, p2});
+    glEnd();
+}
+
+void glDrawArc(const SbVec3f& center, float radius, float startAngle=0.,
+               float endAngle=2.0*std::numbers::pi, int countSegments=0){
+    float range = endAngle - startAngle;
+
+    if (countSegments == 0){
+        countSegments = std::max(6, abs(int(25.0 * range / std::numbers::pi)));
+    }
+
+    float segment = range / (countSegments-1);
+
+    glBegin(GL_LINE_STRIP);
+    for (int i=0; i < countSegments; i++) {
+        float theta = startAngle + segment*i;
+        SbVec3f v1 = center + radius * SbVec3f(cos(theta),sin(theta),0);
+        glVertex(v1);
+    }
+    glEnd();
+}
+
+void glDrawArrow(const SbVec3f& base, const SbVec3f& dir, float width, float length){
+    // Calculate arrowhead points
+    SbVec3f normal(dir[1], -dir[0], 0);
+    SbVec3f arrowLeft = base - length * dir + width * normal;
+    SbVec3f arrowRight = base - length * dir - width * normal;
+
+    // Draw arrowheads
+    glBegin(GL_TRIANGLES);
+    glVertexes({base, arrowLeft, arrowRight});
+    glEnd();
+}
+
+} // namespace
+
 
 SO_NODE_SOURCE(SoDatumLabel)
 
@@ -78,6 +134,7 @@ SoDatumLabel::SoDatumLabel()
     SO_NODE_ADD_FIELD(name, ("Helvetica"));
     SO_NODE_ADD_FIELD(size, (10.F));
     SO_NODE_ADD_FIELD(lineWidth, (2.F));
+    SO_NODE_ADD_FIELD(sampling, (2.F));
 
     SO_NODE_ADD_FIELD(datumtype, (SoDatumLabel::DISTANCE));
 
@@ -131,7 +188,8 @@ void SoDatumLabel::drawImage()
     QColor front;
     front.setRgbF(t[0],t[1], t[2]);
 
-    QImage image(w, h,QImage::Format_ARGB32_Premultiplied);
+    QImage image(w * sampling.getValue(), h * sampling.getValue(), QImage::Format_ARGB32_Premultiplied);
+    image.setDevicePixelRatio(sampling.getValue());
     image.fill(0x00000000);
 
     QPainter painter(&image);
@@ -186,11 +244,12 @@ public:
 private:
     void getBBox(const std::vector<SbVec3f>& corners, SbBox3f& box, SbVec3f& center) const
     {
+        constexpr float floatMax = std::numeric_limits<float>::max();
         if (corners.size() > 1) {
-            float minX = FLT_MAX;
-            float minY = FLT_MAX;
-            float maxX = -FLT_MAX;
-            float maxY = -FLT_MAX;
+            float minX = floatMax;
+            float minY = floatMax;
+            float maxX = -floatMax;
+            float maxY = -floatMax;
             for (SbVec3f it : corners) {
                 minX = (it[0] < minX) ? it[0] : minX;
                 minY = (it[1] < minY) ? it[1] : minY;
@@ -236,14 +295,15 @@ private:
 
         SbVec3f dir;
         SbVec3f normal;
+        constexpr float floatEpsilon = std::numeric_limits<float>::epsilon();
         if (label->datumtype.getValue() == SoDatumLabel::DISTANCE) {
             dir = (p2-p1);
         }
         else if (label->datumtype.getValue() == SoDatumLabel::DISTANCEX) {
-            dir = SbVec3f( (p2[0] - p1[0] >= FLT_EPSILON) ? 1 : -1, 0, 0);
+            dir = SbVec3f( (p2[0] - p1[0] >= floatEpsilon) ? 1 : -1, 0, 0);
         }
         else if (label->datumtype.getValue() == SoDatumLabel::DISTANCEY) {
-            dir = SbVec3f(0, (p2[1] - p1[1] >= FLT_EPSILON) ? 1 : -1, 0);
+            dir = SbVec3f(0, (p2[1] - p1[1] >= floatEpsilon) ? 1 : -1, 0);
         }
 
         dir.normalize();
@@ -452,7 +512,7 @@ private:
         float imgHeight = scale * (float) (srch);
         float imgWidth  = aspectRatio * imgHeight;
 
-                // Get the points stored in the pnt field
+        // Get the points stored in the pnt field
         const SbVec3f *points = label->pnts.getValues(0);
         if (label->pnts.getNum() < 3) {
             return {};
@@ -467,13 +527,13 @@ private:
         SbVec3f img3 = SbVec3f( imgWidth / 2, -imgHeight / 2, 0.F);
         SbVec3f img4 = SbVec3f( imgWidth / 2,  imgHeight / 2, 0.F);
 
-                //Text orientation
+        //Text orientation
         SbVec3f dir = (p2 - p1);
         dir.normalize();
         SbVec3f normal = SbVec3f (-dir[1], dir[0], 0);
         float angle = atan2f(dir[1],dir[0]);
 
-                // Rotate through an angle
+        // Rotate through an angle
         float s = sin(angle);
         float c = cos(angle);
         img1 = SbVec3f((img1[0] * c) - (img1[1] * s), (img1[0] * s) + (img1[1] * c), 0.F);
@@ -483,16 +543,32 @@ private:
 
         float length = label->param1.getValue();
 
-                // Text location
+
+        // Text location
         SbVec3f vm = (p1+p2)/2 - ctr;
         vm.normalize();
-        SbVec3f textCenter = ctr + vm * (length + imgHeight);
+
+        SbVec3f vc1 = (p1 - ctr);
+        SbVec3f vc2 = (p2 - ctr);
+
+        float startangle = atan2f(vc1[1], vc1[0]);
+        float endangle = atan2f(vc2[1], vc2[0]);
+        if (endangle < startangle) {
+            endangle += 2.F * std::numbers::pi_v<float>;
+        }
+
+        SbVec3f textCenter;
+        if (endangle - startangle <= std::numbers::pi) {
+            textCenter = ctr + vm * (length + imgHeight);
+        } else {
+            textCenter = ctr - vm * (length + 2. * imgHeight);
+        }
         img1 += textCenter;
         img2 += textCenter;
         img3 += textCenter;
         img4 += textCenter;
 
-                // Finds the mins and maxes
+        // Finds the mins and maxes
         std::vector<SbVec3f> corners;
         float margin = imgHeight / 4.0F;
         corners.push_back(textCenter + dir * (imgWidth / 2.0F + margin) - normal * (imgHeight / 2.0F + margin));
@@ -560,14 +636,16 @@ SbVec3f SoDatumLabel::getLabelTextCenterDistance(const SbVec3f& p1, const SbVec3
 
     SbVec3f dir;
     SbVec3f normal;
+
+    constexpr float floatEpsilon = std::numeric_limits<float>::epsilon();
     if (datumtype.getValue() == SoDatumLabel::DISTANCE) {
         dir = (p2 - p1);
     }
     else if (datumtype.getValue() == SoDatumLabel::DISTANCEX) {
-        dir = SbVec3f((p2[0] - p1[0] >= FLT_EPSILON) ? 1 : -1, 0, 0);
+        dir = SbVec3f((p2[0] - p1[0] >= floatEpsilon) ? 1 : -1, 0, 0);
     }
     else if (datumtype.getValue() == SoDatumLabel::DISTANCEY) {
-        dir = SbVec3f(0, (p2[1] - p1[1] >= FLT_EPSILON) ? 1 : -1, 0);
+        dir = SbVec3f(0, (p2[1] - p1[1] >= floatEpsilon) ? 1 : -1, 0);
     }
 
     dir.normalize();
@@ -613,10 +691,27 @@ SbVec3f SoDatumLabel::getLabelTextCenterArcLength(const SbVec3f& ctr, const SbVe
 {
     float length = this->param1.getValue();
 
-            // Text location
+    // Angles calculations
+    SbVec3f vc1 = (p1 - ctr);
+    SbVec3f vc2 = (p2 - ctr);
+
+    float startangle = atan2f(vc1[1], vc1[0]);
+    float endangle = atan2f(vc2[1], vc2[0]);
+
+    if (endangle < startangle) {
+        endangle += 2.F * std::numbers::pi_v<float>;
+    }
+
+    // Text location
     SbVec3f vm = (p1+p2)/2 - ctr;
     vm.normalize();
-    SbVec3f textCenter = ctr + vm * (length + this->imgHeight);
+
+    SbVec3f textCenter;
+    if (endangle - startangle <= std::numbers::pi) {
+        textCenter = ctr + vm * (length + this->imgHeight);
+    } else {
+        textCenter = ctr - vm * (length + 2. * this->imgHeight);
+    }
     return textCenter;
 }
 
@@ -624,12 +719,13 @@ SbVec3f SoDatumLabel::getLabelTextCenterArcLength(const SbVec3f& ctr, const SbVe
 void SoDatumLabel::generateDistancePrimitives(SoAction * action, const SbVec3f& p1, const SbVec3f& p2)
 {
     SbVec3f dir;
+    constexpr float floatEpsilon = std::numeric_limits<float>::epsilon();
     if (this->datumtype.getValue() == DISTANCE) {
         dir = (p2-p1);
     } else if (this->datumtype.getValue() == DISTANCEX) {
-        dir = SbVec3f( (p2[0] - p1[0] >= FLT_EPSILON) ? 1 : -1, 0, 0);
+        dir = SbVec3f( (p2[0] - p1[0] >= floatEpsilon) ? 1 : -1, 0, 0);
     } else if (this->datumtype.getValue() == DISTANCEY) {
-        dir = SbVec3f(0, (p2[1] - p1[1] >= FLT_EPSILON) ? 1 : -1, 0);
+        dir = SbVec3f(0, (p2[1] - p1[1] >= floatEpsilon) ? 1 : -1, 0);
     }
 
     dir.normalize();
@@ -872,7 +968,8 @@ void SoDatumLabel::generateArcLengthPrimitives(SoAction * action, const SbVec3f&
 void SoDatumLabel::generatePrimitives(SoAction * action)
 {
     // Initialisation check (needs something more sensible) prevents an infinite loop bug
-    if (this->imgHeight <= FLT_EPSILON || this->imgWidth <= FLT_EPSILON) {
+    constexpr float floatEpsilon = std::numeric_limits<float>::epsilon();
+    if (this->imgHeight <= floatEpsilon || this->imgWidth <= floatEpsilon) {
         return;
     }
 
@@ -1070,12 +1167,14 @@ void SoDatumLabel::getDimension(float scale, int& srcw, int& srch)
     srch = imgsize[1];
 
     float aspectRatio =  (float) srcw / (float) srch;
-    this->imgHeight = scale * (float) (srch);
+    this->imgHeight = scale * (float) (srch) / sampling.getValue();
     this->imgWidth  = aspectRatio * (float) this->imgHeight;
 }
 
 void SoDatumLabel::drawDistance(const SbVec3f* points, float scale, int srch, float& angle, SbVec3f& textOffset)
 {
+    using std::numbers::pi;
+
     float length = this->param1.getValue();
     float length2 = this->param2.getValue();
 
@@ -1083,12 +1182,13 @@ void SoDatumLabel::drawDistance(const SbVec3f* points, float scale, int srch, fl
     SbVec3f p2 = points[1];
 
     SbVec3f dir;
+    constexpr float floatEpsilon = std::numeric_limits<float>::epsilon();
     if (this->datumtype.getValue() == DISTANCE) {
         dir = (p2-p1);
     } else if (this->datumtype.getValue() == DISTANCEX) {
-        dir = SbVec3f( (p2[0] - p1[0] >= FLT_EPSILON) ? 1 : -1, 0, 0);
+        dir = SbVec3f( (p2[0] - p1[0] >= floatEpsilon) ? 1 : -1, 0, 0);
     } else if (this->datumtype.getValue() == DISTANCEY) {
-        dir = SbVec3f(0, (p2[1] - p1[1] >= FLT_EPSILON) ? 1 : -1, 0);
+        dir = SbVec3f(0, (p2[1] - p1[1] >= floatEpsilon) ? 1 : -1, 0);
     }
 
     dir.normalize();
@@ -1107,10 +1207,10 @@ void SoDatumLabel::drawDistance(const SbVec3f* points, float scale, int srch, fl
 
     // Get magnitude of angle between horizontal
     angle = atan2f(dir[1],dir[0]);
-    if (angle > M_PI_2+M_PI/12) {
-        angle -= (float)M_PI;
-    } else if (angle <= -M_PI_2+M_PI/12) {
-        angle += (float)M_PI;
+    if (angle > pi/2 + pi/12) {
+        angle -= (float)pi;
+    } else if (angle <= -pi/2 + pi/12) {
+        angle += (float)pi;
     }
 
     textOffset = midpos + normal * length + dir * length2;
@@ -1206,7 +1306,7 @@ void SoDatumLabel::drawDistance(const SbVec3f* points)
         float startangle1 = this->param3.getValue();
         float radius1 = this->param5.getValue();
         SbVec3f center = points[2];
-        int countSegments = std::max(6, abs(int(50.0 * range1 / (2 * M_PI))));
+        int countSegments = std::max(6, abs(int(50.0 * range1 / (2 * std::numbers::pi))));
         double segment = range1 / (countSegments - 1);
 
         glBegin(GL_LINE_STRIP);
@@ -1222,7 +1322,7 @@ void SoDatumLabel::drawDistance(const SbVec3f* points)
         float startangle2 = this->param6.getValue();
         float radius2 = this->param8.getValue();
         SbVec3f center = points[3];
-        int countSegments = std::max(6, abs(int(50.0 * range2 / (2 * M_PI))));
+        int countSegments = std::max(6, abs(int(50.0 * range2 / (2 * std::numbers::pi))));
         double segment = range2 / (countSegments - 1);
 
         glBegin(GL_LINE_STRIP);
@@ -1257,10 +1357,10 @@ void SoDatumLabel::drawRadiusOrDiameter(const SbVec3f* points, float& angle, SbV
 
     // Get magnitude of angle between horizontal
     angle = atan2f(dir[1],dir[0]);
-    if (angle > M_PI_2+M_PI/12) {
-        angle -= (float)M_PI;
-    } else if (angle <= -M_PI_2+M_PI/12) {
-        angle += (float)M_PI;
+    if (angle > std::numbers::pi/2 + std::numbers::pi/12) {
+        angle -= (float)std::numbers::pi;
+    } else if (angle <= -std::numbers::pi/2 + std::numbers::pi/12) {
+        angle += (float)std::numbers::pi;
     }
 
     textOffset = pos;
@@ -1316,7 +1416,7 @@ void SoDatumLabel::drawRadiusOrDiameter(const SbVec3f* points, float& angle, SbV
     float startangle = this->param3.getValue();
     float range = this->param4.getValue();
     if (range != 0.0) {
-        int countSegments = std::max(6, abs(int(50.0 * range / (2 * M_PI))));
+        int countSegments = std::max(6, abs(int(50.0 * range / (2 * std::numbers::pi))));
         double segment = range / (countSegments - 1);
 
         glBegin(GL_LINE_STRIP);
@@ -1358,84 +1458,41 @@ void SoDatumLabel::drawAngle(const SbVec3f* points, float& angle, SbVec3f& textO
     SbVec3f v0(cos(startangle+range/2),sin(startangle+range/2),0);
 
     // leave some space for the text
-    if (range >= 0) {
-        range = std::max(0.2F*range, range - this->imgWidth/(2*r));
-    }
-    else {
-        range = std::min(0.2F*range, range + this->imgWidth/(2*r));
-    }
-
-    int countSegments = std::max(6, abs(int(50.0 * range / (2 * M_PI))));
-    double segment = range / (2*countSegments-2);
+    double textMargin = std::min(0.2F * abs(range), this->imgWidth / (2 * r));
 
     textOffset = p0 + v0 * r;
 
-
     // Draw
-    glBegin(GL_LINE_STRIP);
-
-    for (int i=0; i < countSegments; i++) {
-        double theta = startangle + segment*i;
-        SbVec3f v1 = p0+SbVec3f(r*cos(theta),r*sin(theta),0);
-        glVertex2f(v1[0],v1[1]);
-    }
-    glEnd();
-
-    glBegin(GL_LINE_STRIP);
-    for (int i=0; i < countSegments; i++) {
-        double theta = endangle - segment*i;
-        SbVec3f v1 = p0+SbVec3f(r*cos(theta),r*sin(theta),0);
-        glVertex2f(v1[0],v1[1]);
-    }
-    glEnd();
+    glDrawArc(p0, r, startangle, startangle+range/2.-textMargin);
+    glDrawArc(p0, r, startangle+range/2.+textMargin, endangle);
 
     // Direction vectors for start and end lines
-    SbVec3f v1(cos(startangle),sin(startangle),0);
-    SbVec3f v2(cos(endangle),sin(endangle),0);
+    SbVec3f v1(cos(startangle), sin(startangle), 0);
+    SbVec3f v2(cos(endangle), sin(endangle), 0);
+
+    if (range < 0) {
+        std::swap(v1, v2);
+    }
 
     SbVec3f pnt1 = p0 + (r - endLineLength1) * v1;
     SbVec3f pnt2 = p0 + (r + endLineLength12) * v1;
     SbVec3f pnt3 = p0 + (r - endLineLength2) * v2;
     SbVec3f pnt4 = p0 + (r + endLineLength22) * v2;
 
-    glBegin(GL_LINES);
-        glVertex2f(pnt1[0],pnt1[1]);
-        glVertex2f(pnt2[0],pnt2[1]);
-
-        glVertex2f(pnt3[0],pnt3[1]);
-        glVertex2f(pnt4[0],pnt4[1]);
-    glEnd();
+    glDrawLine(pnt1, pnt2);
+    glDrawLine(pnt3, pnt4);
 
     // Create the arrowheads
     float arrowLength = margin * 2;
     float arrowWidth = margin * 0.5F;
 
-    // Normals for the arrowheads
     SbVec3f dirStart(v1[1], -v1[0], 0);
-    SbVec3f dirEnd(-v2[1], v2[0], 0);
-
-    // Calculate arrowhead points for start angle
     SbVec3f startArrowBase = p0 + r * v1;
-    SbVec3f startArrowLeft = startArrowBase - arrowLength * dirStart + arrowWidth * v1;
-    SbVec3f startArrowRight = startArrowBase - arrowLength * dirStart - arrowWidth * v1;
+    glDrawArrow(startArrowBase, dirStart, arrowWidth, arrowLength);
 
-    // Calculate arrowhead points for end angle
+    SbVec3f dirEnd(-v2[1], v2[0], 0);
     SbVec3f endArrowBase = p0 + r * v2;
-    SbVec3f endArrowLeft = endArrowBase - arrowLength * dirEnd + arrowWidth * v2;
-    SbVec3f endArrowRight = endArrowBase - arrowLength * dirEnd - arrowWidth * v2;
-
-    // Draw arrowheads
-    glBegin(GL_TRIANGLES);
-    // Start angle arrowhead
-    glVertex2f(startArrowBase[0], startArrowBase[1]);
-    glVertex2f(startArrowLeft[0], startArrowLeft[1]);
-    glVertex2f(startArrowRight[0], startArrowRight[1]);
-
-    // End angle arrowhead
-    glVertex2f(endArrowBase[0], endArrowBase[1]);
-    glVertex2f(endArrowLeft[0], endArrowLeft[1]);
-    glVertex2f(endArrowRight[0], endArrowRight[1]);
-    glEnd();
+    glDrawArrow(endArrowBase, dirEnd, arrowWidth, arrowLength);
 }
 
 void SoDatumLabel::drawSymmetric(const SbVec3f* points)
@@ -1482,6 +1539,8 @@ void SoDatumLabel::drawSymmetric(const SbVec3f* points)
 
 void SoDatumLabel::drawArcLength(const SbVec3f* points, float& angle, SbVec3f& textOffset)
 {
+    using std::numbers::pi;
+
     SbVec3f ctr = points[0];
     SbVec3f p1 = points[1];
     SbVec3f p2 = points[2];
@@ -1496,89 +1555,64 @@ void SoDatumLabel::drawArcLength(const SbVec3f* points, float& angle, SbVec3f& t
     float startangle = atan2f(vc1[1], vc1[0]);
     float endangle = atan2f(vc2[1], vc2[0]);
     if (endangle < startangle) {
-        endangle += 2. * (float)M_PI;
+        endangle += 2.0F * (float)pi;
     }
 
-    float radius = vc1.length();
-
     float range = endangle - startangle;
+
+    float radius = vc1.length();
 
     //Text orientation
     SbVec3f dir = (p2 - p1);
     dir.normalize();
     // Get magnitude of angle between horizontal
     angle = atan2f(dir[1],dir[0]);
-    if (angle > M_PI_2+M_PI/12) {
-        angle -= (float)M_PI;
-    } else if (angle <= -M_PI_2+M_PI/12) {
-        angle += (float)M_PI;
+    if (angle > pi/2 + pi/12) {
+        angle -= (float)pi;
+    } else if (angle <= -pi/2 + pi/12) {
+        angle += (float)pi;
     }
+       // Text location
+    textOffset = getLabelTextCenterArcLength(ctr, p1, p2);
 
-    // Text location
+    // lines direction
     SbVec3f vm = (p1+p2)/2 - ctr;
     vm.normalize();
-    textOffset = ctr + vm * (length + this->imgHeight);
 
-    int countSegments = std::max(6, abs(int(50.0 * range / (2 * M_PI))));
-    double segment = range / (countSegments - 1);
-
-    // Draw arc
-    glBegin(GL_LINE_STRIP);
-
-    for (int i=0; i < countSegments; i++) {
-        double theta = startangle + segment*i;
-        SbVec3f v1 = ctr + radius * SbVec3f(cos(theta),sin(theta),0) + (length-radius) * vm;
-        glVertex2f(v1[0],v1[1]);
-    }
-    glEnd();
-
-    //Draw lines
+    // Lines points
     SbVec3f pnt1 = p1;
     SbVec3f pnt2 = p1 + (length-radius) * vm;
     SbVec3f pnt3 = p2;
     SbVec3f pnt4 = p2 + (length-radius) * vm;
 
-    glBegin(GL_LINES);
-    glVertex2f(pnt1[0],pnt1[1]);
-    glVertex2f(pnt2[0],pnt2[1]);
+        // Draw arc
+    if (range <= pi) {
+        glDrawArc(ctr + (length-radius)*vm, radius, startangle, endangle);
+    }
+    else {
+        pnt2 = p1 + length * vm;
+        pnt4 = p2 + length * vm;
+        vc1 = (pnt2 - ctr);
+        vc2 = (pnt4 - ctr);
+        startangle = atan2f(vc1[1], vc1[0]);
+        endangle = atan2f(vc2[1], vc2[0]);
+        glDrawArc(ctr, vc1.length(), startangle, endangle);
+    }
 
-    glVertex2f(pnt3[0],pnt3[1]);
-    glVertex2f(pnt4[0],pnt4[1]);
-    glEnd();
+    //Draw lines
+    glDrawLine(pnt1, pnt2);
+    glDrawLine(pnt3, pnt4);
 
     // Create the arrowheads
-    // Direction vectors at arc start and end
-    SbVec3f v1(cos(startangle),sin(startangle),0);
-    SbVec3f v2(cos(endangle),sin(endangle),0);
     float arrowLength = margin * 2;
     float arrowWidth = margin * 0.5F;
 
-    // Normals for the arrowheads
-    SbVec3f dirStart(v1[1], -v1[0], 0);
-    SbVec3f dirEnd(-v2[1], v2[0], 0);
+        // Normals for the arrowheads at arc start and end
+    SbVec3f dirStart(sin(startangle), -cos(startangle), 0);
+    SbVec3f dirEnd(-sin(endangle), cos(endangle), 0);
 
-    // Calculate arrowhead points for start angle
-    SbVec3f startArrowBase = pnt2;
-    SbVec3f startArrowLeft = startArrowBase - arrowLength * dirStart + arrowWidth * v1;
-    SbVec3f startArrowRight = startArrowBase - arrowLength * dirStart - arrowWidth * v1;
-
-    // Calculate arrowhead points for end angle
-    SbVec3f endArrowBase = pnt4;
-    SbVec3f endArrowLeft = endArrowBase - arrowLength * dirEnd + arrowWidth * v2;
-    SbVec3f endArrowRight = endArrowBase - arrowLength * dirEnd - arrowWidth * v2;
-
-    // Draw arrowheads
-    glBegin(GL_TRIANGLES);
-    // Start angle arrowhead
-    glVertex2f(startArrowBase[0], startArrowBase[1]);
-    glVertex2f(startArrowLeft[0], startArrowLeft[1]);
-    glVertex2f(startArrowRight[0], startArrowRight[1]);
-
-    // End angle arrowhead
-    glVertex2f(endArrowBase[0], endArrowBase[1]);
-    glVertex2f(endArrowLeft[0], endArrowLeft[1]);
-    glVertex2f(endArrowRight[0], endArrowRight[1]);
-    glEnd();
+    glDrawArrow(pnt2, dirStart, arrowWidth, arrowLength);
+    glDrawArrow(pnt4, dirEnd, arrowWidth, arrowLength);
 }
 
 // NOLINTNEXTLINE
@@ -1592,7 +1626,7 @@ void SoDatumLabel::drawText(SoState *state, int srcw, int srch, float angle, con
     const SbViewVolume & vv = SoViewVolumeElement::get(state);
     SbVec3f z = vv.zVector();
 
-    bool flip = norm.getValue().dot(z) > FLT_EPSILON;
+    bool flip = norm.getValue().dot(z) > std::numeric_limits<float>::epsilon();
 
     static bool init = false;
     static bool npot = false;
@@ -1664,7 +1698,7 @@ void SoDatumLabel::drawText(SoState *state, int srcw, int srch, float angle, con
 
     // Apply a rotation and translation matrix
     glTranslatef(textOffset[0], textOffset[1], textOffset[2]);
-    glRotatef((GLfloat) angle * 180 / M_PI, 0,0,1);
+    glRotatef(Base::toDegrees<GLfloat>(angle), 0,0,1);
     glBegin(GL_QUADS);
 
     glColor3f(1.F, 1.F, 1.F);

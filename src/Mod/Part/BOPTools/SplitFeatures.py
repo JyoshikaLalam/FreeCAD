@@ -65,15 +65,15 @@ class FeatureBooleanFragments:
     """The BooleanFragments feature object."""
 
     def __init__(self,obj):
-        obj.addProperty("App::PropertyLinkList","Objects","BooleanFragments","Object to compute intersections between.")
+        obj.addProperty("App::PropertyLinkList","Objects","BooleanFragments","Object to compute intersections between.", locked=True)
         obj.addProperty("App::PropertyEnumeration","Mode","BooleanFragments",
                         "- Standard: wires, shells, compsolids remain in one piece.\n"
                         "- Split: wires, shells, compsolids are split.\n"
-                        "- CompSolid: make compsolid from solid fragments.")
+                        "- CompSolid: make compsolid from solid fragments.", locked=True)
         obj.Mode = ["Standard", "Split", "CompSolid"]
         obj.addProperty("App::PropertyLength","Tolerance","BooleanFragments",
                         "Tolerance when intersecting (fuzzy value). "
-                        "In addition to tolerances of the shapes.")
+                        "In addition to tolerances of the shapes.", locked=True)
 
         obj.Proxy = self
         self.Type = "FeatureBooleanFragments"
@@ -94,7 +94,7 @@ class ViewProviderBooleanFragments:
         vobj.Proxy = self
 
     def getIcon(self):
-        return getIconPath("Part_BooleanFragments.svg")
+        return ":/icons/booleans/Part_BooleanFragments.svg"
 
     def attach(self, vobj):
         self.ViewObject = vobj
@@ -222,16 +222,16 @@ class FeatureSlice:
     """The Slice feature object."""
 
     def __init__(self,obj):
-        obj.addProperty("App::PropertyLink","Base","Slice","Object to be sliced.")
-        obj.addProperty("App::PropertyLinkList","Tools","Slice","Objects that slice.")
+        obj.addProperty("App::PropertyLink","Base","Slice","Object to be sliced.", locked=True)
+        obj.addProperty("App::PropertyLinkList","Tools","Slice","Objects that slice.", locked=True)
         obj.addProperty("App::PropertyEnumeration","Mode","Slice",
                         "- Standard: wires, shells, compsolids remain in one piece.\n"
                         "- Split: wires, shells, compsolids are split.\n"
-                        "- CompSolid: make compsolid from solid fragments.")
+                        "- CompSolid: make compsolid from solid fragments.", locked=True)
         obj.Mode = ["Standard", "Split", "CompSolid"]
         obj.addProperty("App::PropertyLength","Tolerance","Slice",
                         "Tolerance when intersecting (fuzzy value). "
-                        "In addition to tolerances of the shapes.")
+                        "In addition to tolerances of the shapes.", locked=True)
 
         obj.Proxy = self
         self.Type = "FeatureSlice"
@@ -252,7 +252,7 @@ class ViewProviderSlice:
         vobj.Proxy = self
 
     def getIcon(self):
-        return getIconPath("Part_Slice.svg")
+        return ":/icons/booleans/Part_Slice.svg"
 
     def attach(self, vobj):
         self.ViewObject = vobj
@@ -408,10 +408,10 @@ class FeatureXOR:
     """The XOR feature object."""
 
     def __init__(self,obj):
-        obj.addProperty("App::PropertyLinkList","Objects","XOR","Object to compute intersections between.")
+        obj.addProperty("App::PropertyLinkList","Objects","XOR","Object to compute intersections between.", locked=True)
         obj.addProperty("App::PropertyLength","Tolerance","XOR",
                         "Tolerance when intersecting (fuzzy value). "
-                        "In addition to tolerances of the shapes.")
+                        "In addition to tolerances of the shapes.", locked=True)
 
         obj.Proxy = self
         self.Type = "FeatureXOR"
@@ -432,7 +432,7 @@ class ViewProviderXOR:
         vobj.Proxy = self
 
     def getIcon(self):
-        return getIconPath("Part_XOR.svg")
+        return ":/icons/booleans/Part_XOR.svg"
 
     def attach(self, vobj):
         self.ViewObject = vobj

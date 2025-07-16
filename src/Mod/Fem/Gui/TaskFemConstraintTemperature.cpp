@@ -28,13 +28,14 @@
 #ifndef _PreComp_
 #include <QAction>
 #include <QMessageBox>
+#include <limits>
 #include <sstream>
 #endif
 
 #include <App/Document.h>
 #include <Gui/Command.h>
 #include <Gui/QuantitySpinBox.h>
-#include <Gui/SelectionObject.h>
+#include <Gui/Selection/SelectionObject.h>
 #include <Mod/Fem/App/FemConstraintTemperature.h>
 #include <Mod/Part/App/PartFeature.h>
 
@@ -61,16 +62,16 @@ TaskFemConstraintTemperature::TaskFemConstraintTemperature(
 
     // Get the feature data
     Fem::ConstraintTemperature* pcConstraint =
-        static_cast<Fem::ConstraintTemperature*>(ConstraintView->getObject());
+        ConstraintView->getObject<Fem::ConstraintTemperature>();
 
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
 
     // Fill data into dialog elements
     ui->qsb_temperature->setMinimum(0);
-    ui->qsb_temperature->setMaximum(FLOAT_MAX);
-    ui->qsb_cflux->setMinimum(-FLOAT_MAX);
-    ui->qsb_cflux->setMaximum(FLOAT_MAX);
+    ui->qsb_temperature->setMaximum(std::numeric_limits<float>::max());
+    ui->qsb_cflux->setMinimum(-std::numeric_limits<float>::max());
+    ui->qsb_cflux->setMaximum(std::numeric_limits<float>::max());
 
     App::PropertyEnumeration* constrType = &pcConstraint->ConstraintType;
     QStringList qTypeList;
@@ -99,7 +100,7 @@ TaskFemConstraintTemperature::TaskFemConstraintTemperature(
     }
 
     // create a context menu for the listview of the references
-    createDeleteAction(ui->lw_references);
+    createActions(ui->lw_references);
     connect(deleteAction,
             &QAction::triggered,
             this,
@@ -164,7 +165,7 @@ void TaskFemConstraintTemperature::onCFluxChanged(double)
 
 void TaskFemConstraintTemperature::onConstrTypeChanged(int item)
 {
-    auto obj = static_cast<Fem::ConstraintTemperature*>(ConstraintView->getObject());
+    auto obj = ConstraintView->getObject<Fem::ConstraintTemperature>();
     obj->ConstraintType.setValue(item);
     const char* type = obj->ConstraintType.getValueAsString();
     if (strcmp(type, "Temperature") == 0) {
@@ -190,7 +191,7 @@ void TaskFemConstraintTemperature::addToSelection()
         return;
     }
     Fem::ConstraintTemperature* pcConstraint =
-        static_cast<Fem::ConstraintTemperature*>(ConstraintView->getObject());
+        ConstraintView->getObject<Fem::ConstraintTemperature>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
 
@@ -204,9 +205,7 @@ void TaskFemConstraintTemperature::addToSelection()
             ConstraintView->getObject()->getDocument()->getObject(it.getFeatName());
         for (const auto& subName : subNames) {  // for every selected sub element
             bool addMe = true;
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subName);
-                 itr != SubElements.end();
+            for (auto itr = std::ranges::find(SubElements, subName); itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
                                  subName)) {  // for every sub element in selection that
@@ -241,7 +240,7 @@ void TaskFemConstraintTemperature::removeFromSelection()
         return;
     }
     Fem::ConstraintTemperature* pcConstraint =
-        static_cast<Fem::ConstraintTemperature*>(ConstraintView->getObject());
+        ConstraintView->getObject<Fem::ConstraintTemperature>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
     std::vector<size_t> itemsToDel;
@@ -254,9 +253,7 @@ void TaskFemConstraintTemperature::removeFromSelection()
         const App::DocumentObject* obj = it.getObject();
 
         for (const auto& subName : subNames) {  // for every selected sub element
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subName);
-                 itr != SubElements.end();
+            for (auto itr = std::ranges::find(SubElements, subName); itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
                                  subName)) {  // for every sub element in selection that
@@ -271,7 +268,7 @@ void TaskFemConstraintTemperature::removeFromSelection()
             }
         }
     }
-    std::sort(itemsToDel.begin(), itemsToDel.end());
+    std::ranges::sort(itemsToDel);
     while (!itemsToDel.empty()) {
         Objects.erase(Objects.begin() + itemsToDel.back());
         SubElements.erase(SubElements.begin() + itemsToDel.back());
@@ -306,12 +303,12 @@ const std::string TaskFemConstraintTemperature::getReferences() const
 
 std::string TaskFemConstraintTemperature::get_temperature() const
 {
-    return ui->qsb_temperature->value().getSafeUserString().toStdString();
+    return ui->qsb_temperature->value().getSafeUserString();
 }
 
 std::string TaskFemConstraintTemperature::get_cflux() const
 {
-    return ui->qsb_cflux->value().getSafeUserString().toStdString();
+    return ui->qsb_cflux->value().getSafeUserString();
 }
 
 std::string TaskFemConstraintTemperature::get_constraint_type() const

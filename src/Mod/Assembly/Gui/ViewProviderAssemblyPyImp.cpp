@@ -42,6 +42,16 @@ std::string ViewProviderAssemblyPy::representation() const
     return str.str();
 }
 
+PyObject* ViewProviderAssemblyPy::isInEditMode(PyObject* args)
+{
+    if (!PyArg_ParseTuple(args, "")) {
+        return nullptr;
+    }
+
+    Py::Boolean val(getViewProviderAssemblyPtr()->isInEditMode());
+    return Py::new_reference_to(val);
+}
+
 Py::Boolean ViewProviderAssemblyPy::getEnableMovement() const
 {
     return {getViewProviderAssemblyPtr()->getEnableMovement()};
@@ -87,7 +97,7 @@ PyObject* ViewProviderAssemblyPy::getDragger(PyObject* args)
     if (!PyArg_ParseTuple(args, "")) {
         return nullptr;
     }
-    Gui::SoFCCSysDragger* asmDragger = getViewProviderAssemblyPtr()->getDragger();
+    Gui::SoTransformDragger* asmDragger = getViewProviderAssemblyPtr()->getDragger();
 
     return Base::Interpreter().createSWIGPointerObj("pivy.coin", "SoDragger *", asmDragger, 0);
 }

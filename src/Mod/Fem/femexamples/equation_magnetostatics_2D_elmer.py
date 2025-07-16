@@ -248,19 +248,19 @@ def setup(doc=None, solvertype="elmer"):
     Magnetization_lower = ObjectsFem.makeConstraintMagnetization(doc, "Magnetization_Lower_End")
     Magnetization_lower.References = [(BooleanFragments, "Face1")]
     Magnetization_lower.Magnetization_re_1 = "-7500.0 A/m"
-    Magnetization_lower.Magnetization_re_1_Disabled = False
+    Magnetization_lower.EnableMagnetization_1 = True
     analysis.addObject(Magnetization_lower)
 
     # magnetization upper
     Magnetization_upper = ObjectsFem.makeConstraintMagnetization(doc, "Magnetization_Upper_End")
     Magnetization_upper.References = [(BooleanFragments, "Face2")]
     Magnetization_upper.Magnetization_re_1 = "7500.0 A/m"
-    Magnetization_upper.Magnetization_re_1_Disabled = False
+    Magnetization_upper.EnableMagnetization_1 = True
     analysis.addObject(Magnetization_upper)
 
     # mesh
     femmesh_obj = analysis.addObject(ObjectsFem.makeMeshGmsh(doc, get_meshname()))[0]
-    femmesh_obj.Part = BooleanFragments
+    femmesh_obj.Shape = BooleanFragments
     femmesh_obj.CharacteristicLengthMax = "100.0 mm"
     femmesh_obj.ViewObject.Visibility = False
 

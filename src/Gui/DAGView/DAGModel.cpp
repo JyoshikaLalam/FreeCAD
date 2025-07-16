@@ -47,7 +47,7 @@
 #include <Gui/Document.h>
 #include <Gui/MainWindow.h>
 #include <Gui/MenuManager.h>
-#include <Gui/Selection.h>
+#include <Gui/Selection/Selection.h>
 #include <Gui/ViewProviderDocumentObject.h>
 
 #include "DAGModel.h"
@@ -146,7 +146,7 @@ Model::Model(QObject *parentIn, const Gui::Document &documentIn) : QGraphicsScen
   //NOLINTEND
 
   for (auto obj : documentIn.getDocument()->getObjects()) {
-    auto vpd = Base::freecad_dynamic_cast<Gui::ViewProviderDocumentObject>(documentIn.getViewProvider(obj));
+    auto vpd = freecad_cast<Gui::ViewProviderDocumentObject*>(documentIn.getViewProvider(obj));
     if (vpd)
       slotNewObject(*vpd);
   }
@@ -308,15 +308,21 @@ void Model::slotChangeObject(const ViewProviderDocumentObject &VPDObjectIn, cons
   //renaming of objects.
   if (std::string("Label") == name)
   {
-    const GraphLinkRecord &record = findRecord(&VPDObjectIn, *graphLink);
-    auto text = (*theGraph)[record.vertex].text.get();
-    text->setPlainText(QString::fromUtf8(record.DObject->Label.getValue()));
+    if (hasRecord(&VPDObjectIn, *graphLink))
+    {
+      const GraphLinkRecord &record = findRecord(&VPDObjectIn, *graphLink);
+      auto text = (*theGraph)[record.vertex].text.get();
+      text->setPlainText(QString::fromUtf8(record.DObject->Label.getValue()));
+    }
   }
-  else if (propertyIn.isDerivedFrom(App::PropertyLinkBase::getClassTypeId()))
+  else if (propertyIn.isDerivedFrom<App::PropertyLinkBase>())
   {
-    const GraphLinkRecord &record = findRecord(&VPDObjectIn, *graphLink);
-    boost::clear_vertex(record.vertex, *theGraph);
-    graphDirty = true;
+    if (hasRecord(&VPDObjectIn, *graphLink))
+    {
+      const GraphLinkRecord &record = findRecord(&VPDObjectIn, *graphLink);
+      boost::clear_vertex(record.vertex, *theGraph);
+      graphDirty = true;
+    }
   }
 }
 
@@ -540,7 +546,7 @@ void Model::updateSlot()
   }
   catch(const boost::not_a_dag &)
   {
-    Base::Console().Error("not a dag exception in DAGView::Model::updateSlot()\n");
+    Base::Console().error("not a dag exception in DAGView::Model::updateSlot()\n");
     //do not continuously report an error for cyclic graphs
     graphDirty = false;
     return;
@@ -1090,7 +1096,7 @@ void Model::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
         contextMenu.addAction(editingFinishedAction);
     }
 
-    if (contextMenu.actions().count() > 0)
+    if (!contextMenu.actions().isEmpty())
         contextMenu.exec(event->screenPos());
   }
 
@@ -1124,7 +1130,7 @@ void Model::renameAcceptedSlot()
   assert(selections.size() == 1);
   const GraphLinkRecord &record = findRecord(selections.front(), *graphLink);
 
-  auto lineEdit = dynamic_cast<LineEdit*>(proxy->widget());
+  auto lineEdit = qobject_cast<LineEdit*>(proxy->widget());
   assert(lineEdit);
   const_cast<App::DocumentObject*>(record.DObject)->Label.setValue(lineEdit->text().toUtf8().constData()); //const hack
 
@@ -1180,11 +1186,11 @@ void Model::visiblyIsolate(Gui::DAG::Vertex sourceIn)
     std::vector<Base::Type> out;
     Base::Type type;
     type = Base::Type::fromName("App::DocumentObjectGroup");
-    if (type != Base::Type::badType()) out.push_back(type);
+    if (!type.isBad()) out.push_back(type);
     type = Base::Type::fromName("App::Part");
-    if (type != Base::Type::badType()) out.push_back(type);
+    if (!type.isBad()) out.push_back(type);
     type = Base::Type::fromName("PartDesign::Body");
-    if (type != Base::Type::badType()) out.push_back(type);
+    if (!type.isBad()) out.push_back(type);
 
     return out;
   };

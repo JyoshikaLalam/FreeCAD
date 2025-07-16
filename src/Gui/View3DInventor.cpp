@@ -47,12 +47,18 @@
 # include <Inventor/nodes/SoOrthographicCamera.h>
 # include <Inventor/nodes/SoPerspectiveCamera.h>
 # include <Inventor/nodes/SoSeparator.h>
+# include <Inventor/SoPickedPoint.h>
 #endif
 
+
+#include <App/Application.h>
 #include <App/Document.h>
+#include <App/GeoFeature.h>
 #include <Base/Builder3D.h>
 #include <Base/Console.h>
 #include <Base/Interpreter.h>
+
+#include <Gui/PreferencePages/DlgSettingsPDF.h>
 
 #include "View3DInventor.h"
 #include "View3DSettings.h"
@@ -63,15 +69,17 @@
 #include "FileDialog.h"
 #include "MainWindow.h"
 #include "NaviCube.h"
-#include "NavigationStyle.h"
+#include "Navigation/NavigationStyle.h"
 #include "SoFCDB.h"
 #include "SoFCSelectionAction.h"
 #include "SoFCVectorizeSVGAction.h"
 #include "View3DInventorViewer.h"
 #include "View3DPy.h"
 #include "ViewProvider.h"
+#include "ViewProviderDocumentObject.h"
 #include "WaitCursor.h"
 
+#include "Utilities.h"
 
 using namespace Gui;
 
@@ -87,7 +95,7 @@ void GLOverlayWidget::paintEvent(QPaintEvent*)
 TYPESYSTEM_SOURCE_ABSTRACT(Gui::View3DInventor,Gui::MDIView)
 
 View3DInventor::View3DInventor(Gui::Document* pcDocument, QWidget* parent,
-                               const QtGLWidget* sharewidget, Qt::WindowFlags wflags)
+                               const QOpenGLWidget* sharewidget, Qt::WindowFlags wflags)
     : MDIView(pcDocument, parent, wflags), _viewerPy(nullptr)
 {
     stack = new QStackedWidget(this);
@@ -100,7 +108,7 @@ View3DInventor::View3DInventor(Gui::Document* pcDocument, QWidget* parent,
     bool smoothing = false;
     bool glformat = false;
     int samples = View3DInventorViewer::getNumSamples();
-    QtGLFormat f;
+    QSurfaceFormat f;
 
     if (samples > 1) {
         glformat = true;
@@ -211,7 +219,7 @@ void View3DInventor::onRename(Gui::Document *pDoc)
 void View3DInventor::onUpdate()
 {
 #ifdef FC_LOGUPDATECHAIN
-    Base::Console().Log("Acti: Gui::View3DInventor::onUpdate()");
+    Base::Console().log("Acti: Gui::View3DInventor::onUpdate()");
 #endif
     update();
     _viewer->redraw();
@@ -244,15 +252,17 @@ void View3DInventor::print()
 void View3DInventor::printPdf()
 {
     QString filename = FileDialog::getSaveFileName(this, tr("Export PDF"), QString(),
-        QString::fromLatin1("%1 (*.pdf)").arg(tr("PDF file")));
+        QStringLiteral("%1 (*.pdf)").arg(tr("PDF file")));
     if (!filename.isEmpty()) {
         Gui::WaitCursor wc;
         QPrinter printer(QPrinter::ScreenResolution);
-        // setPdfVersion sets the printied PDF Version to comply with PDF/A-1b, more details under: https://www.kdab.com/creating-pdfa-documents-qt/
-        printer.setPdfVersion(QPagedPaintDevice::PdfVersion_A1b);
+        // setPdfVersion sets the printed PDF Version to what is chosen in Preferences/Import-Export/PDF
+        // more details under: https://www.kdab.com/creating-pdfa-documents-qt/
+        printer.setPdfVersion(Gui::Dialog::DlgSettingsPDF::evaluatePDFVersion());
         printer.setOutputFormat(QPrinter::PdfFormat);
         printer.setPageOrientation(QPageLayout::Landscape);
         printer.setOutputFileName(filename);
+        printer.setCreator(QString::fromStdString(App::Application::getNameWithVersion()));
         print(&printer);
     }
 }
@@ -524,6 +534,9 @@ bool View3DInventor::onHasMsg(const char* pMsg) const
     if (strcmp("ZoomOut", pMsg) == 0) {
         return true;
     }
+    if (strcmp("AllowsOverlayOnHover", pMsg) == 0) {
+        return true;
+    }
 
     return false;
 }
@@ -770,11 +783,102 @@ void View3DInventor::setCurrentViewMode(ViewMode newmode)
     }
 }
 
+RayPickInfo View3DInventor::getObjInfoRay(Base::Vector3d* startvec, Base::Vector3d* dirvec)
+{
+    double vsx, vsy, vsz;
+    double vdx, vdy, vdz;
+    vsx = startvec->x;
+    vsy = startvec->y;
+    vsz = startvec->z;
+    vdx = dirvec->x;
+    vdy = dirvec->y;
+    vdz = dirvec->z;
+    // near plane clipping is required to avoid false intersections
+    float nearClippingPlane = 0.1F;
+
+    RayPickInfo ret = {false,
+                       Base::Vector3d(),
+                       "",
+                       "",
+                       std::nullopt,
+                       std::nullopt,
+                       std::nullopt};
+    SoRayPickAction action(getViewer()->getSoRenderManager()->getViewportRegion());
+    action.setRay(SbVec3f(vsx, vsy, vsz), SbVec3f(vdx, vdy, vdz), nearClippingPlane);
+    action.apply(getViewer()->getSoRenderManager()->getSceneGraph());
+    SoPickedPoint* Point = action.getPickedPoint();
+
+    if (!Point) {
+        return ret;
+    }
+
+    ret.point = Base::convertTo<Base::Vector3d>(Point->getPoint());
+    ViewProvider* vp = getViewer()->getViewProviderByPath(Point->getPath());
+    if (vp && vp->isDerivedFrom<ViewProviderDocumentObject>()) {
+        if (!vp->isSelectable()) {
+            return ret;
+        }
+        auto vpd = static_cast<ViewProviderDocumentObject*>(vp);
+        if (vp->useNewSelectionModel()) {
+            std::string subname;
+            if (!vp->getElementPicked(Point, subname)) {
+                return ret;
+            }
+            auto obj = vpd->getObject();
+            if (!obj) {
+                return ret;
+            }
+            if (!subname.empty()) {
+                App::ElementNamePair elementName;
+                auto sobj = App::GeoFeature::resolveElement(obj, subname.c_str(), elementName);
+                if (!sobj) {
+                    return ret;
+                }
+                if (sobj != obj) {
+                    ret.parentObject = obj->getExportName();
+                    ret.subName = subname;
+                    obj = sobj;
+                }
+                subname = !elementName.oldName.empty() ? elementName.oldName : elementName.newName;
+            }
+            ret.document = obj->getDocument()->getName();
+            ret.object = obj->getNameInDocument();
+            ret.component = subname;
+            ret.isValid = true;
+        }
+        else {
+            ret.document = vpd->getObject()->getDocument()->getName();
+            ret.object = vpd->getObject()->getNameInDocument();
+            // search for a SoFCSelection node
+            SoFCDocumentObjectAction objaction;
+            objaction.apply(Point->getPath());
+            if (objaction.isHandled()) {
+                ret.component = objaction.componentName.getString();
+            }
+        }
+        // ok, found the node of interest
+        ret.isValid = true;
+    }
+    else {
+        // custom nodes not in a VP: search for a SoFCSelection node
+        SoFCDocumentObjectAction objaction;
+        objaction.apply(Point->getPath());
+        if (objaction.isHandled()) {
+            ret.document = objaction.documentName.getString();
+            ret.object = objaction.objectName.getString();
+            ret.component = objaction.componentName.getString();
+            // ok, found the node of interest
+            ret.isValid = true;
+        }
+    }
+    return ret;
+}
+
 bool View3DInventor::eventFilter(QObject* watched, QEvent* e)
 {
     // As long as this widget is a top-level window (either in 'TopLevel' or 'FullScreen' mode) we
     // need to be notified when an action is added to a widget. This action must also be added to
-    // this window to allow to make use of its shortcut (if defined).
+    // this window to allow one to make use of its shortcut (if defined).
     // Note: We don't need to care about removing an action if its parent widget gets destroyed.
     // This does the action itself for us.
     if (watched != this && e->type() == QEvent::ActionAdded) {

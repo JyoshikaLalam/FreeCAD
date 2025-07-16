@@ -31,11 +31,10 @@
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
 import FreeCAD as App
-
+from draftobjects.draft_annotation import DraftAnnotation
+from draftutils import gui_utils
 from draftutils.messages import _wrn
 from draftutils.translate import translate
-
-from draftobjects.draft_annotation import DraftAnnotation
 
 
 class Text(DraftAnnotation):
@@ -43,8 +42,8 @@ class Text(DraftAnnotation):
 
     def __init__(self, obj):
         obj.Proxy = self
-        self.set_properties(obj)
         self.Type = "Text"
+        self.set_properties(obj)
 
     def set_properties(self, obj):
         """Add properties to the object and set them."""
@@ -57,7 +56,8 @@ class Text(DraftAnnotation):
             obj.addProperty("App::PropertyPlacement",
                             "Placement",
                             "Base",
-                            _tip)
+                            _tip,
+                            locked=True)
             obj.Placement = App.Placement()
 
         if "Text" not in properties:
@@ -69,20 +69,20 @@ class Text(DraftAnnotation):
             obj.addProperty("App::PropertyStringList",
                             "Text",
                             "Base",
-                            _tip)
+                            _tip,
+                            locked=True)
             obj.Text = []
 
     def onDocumentRestored(self,obj):
         """Execute code when the document is restored."""
         super().onDocumentRestored(obj)
-
-        # See loads: self.Type is None for new objects.
-        if self.Type is not None \
-                and hasattr(obj, "ViewObject") \
-                and obj.ViewObject:
-            self.update_properties_0v21(obj, obj.ViewObject)
-
-        self.Type = "Text"
+        gui_utils.restore_view_object(obj, vp_module="view_text", vp_class="ViewProviderText")
+        # See loads:
+        if self.stored_type is None:
+            return
+        if not getattr(obj, "ViewObject", None):
+            return
+        self.update_properties_0v21(obj, obj.ViewObject)
 
     def update_properties_0v21(self, obj, vobj):
         """Update view properties."""
@@ -93,10 +93,11 @@ class Text(DraftAnnotation):
         _wrn("v0.21, " + obj.Label + ", "
              + translate("draft", "renamed 'DisplayMode' options to 'World/Screen'"))
 
-    def loads(self,state):
+    def loads(self, state):
         # Before update_properties_0v21 the self.Type value was stored.
         # We use this to identify older objects that need to be updated.
-        self.Type = state
+        self.stored_type = state
+        self.Type = "Text"
 
 
 # Alias for compatibility with v0.18 and earlier

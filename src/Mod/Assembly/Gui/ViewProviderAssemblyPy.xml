@@ -14,12 +14,21 @@
             <UserDocu>This is the ViewProviderAssembly class</UserDocu>
         </Documentation>
 
+        <Methode Name="isInEditMode">
+          <Documentation>
+            <UserDocu>
+              Return true if the assembly object is currently in edit mode.
+
+              isInEditMode() -> bool
+            </UserDocu>
+          </Documentation>
+        </Methode>
         <Methode Name="getDragger">
           <Documentation>
             <UserDocu>
               Return the assembly dragger coin object.
 
-              getDragger() -> SoFCCSysDragger
+              getDragger() -> SoTransformDragger
 
               Returns: dragger coin object of the assembly
             </UserDocu>

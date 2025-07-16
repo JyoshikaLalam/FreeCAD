@@ -50,7 +50,7 @@ class BSpline(gui_lines.Line):
     """Gui command for the BSpline tool."""
 
     def __init__(self):
-        super(BSpline, self).__init__(wiremode=True)
+        super(BSpline, self).__init__(mode="wire")
 
     def GetResources(self):
         """Set icon, menu and tooltip."""
@@ -58,7 +58,7 @@ class BSpline(gui_lines.Line):
         return {'Pixmap': 'Draft_BSpline',
                 'Accel': "B, S",
                 'MenuText': QT_TRANSLATE_NOOP("Draft_BSpline", "B-spline"),
-                'ToolTip': QT_TRANSLATE_NOOP("Draft_BSpline", "Creates a multiple-point B-spline. CTRL to snap, SHIFT to constrain.")}
+                'ToolTip': QT_TRANSLATE_NOOP("Draft_BSpline", "Creates a multiple-point B-spline.\nSHIFT to constrain.")}
 
     def Activated(self):
         """Execute when the command is called.
@@ -109,10 +109,10 @@ class BSpline(gui_lines.Line):
                 self.pos = arg["Position"]
                 self.node.append(self.point)
                 self.drawUpdate(self.point)
-                if not self.isWire and len(self.node) == 2:
+                if self.mode == "line" and len(self.node) == 2:
                     self.finish(cont=None, closed=False)
                 if len(self.node) > 2:
-                    # DNC: allows to close the curve
+                    # DNC: allows one to close the curve
                     # by placing ends close to each other
                     # with tol = Draft tolerance
                     # old code has been to insensitive

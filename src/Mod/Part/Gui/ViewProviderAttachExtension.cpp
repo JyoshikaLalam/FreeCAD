@@ -23,10 +23,6 @@
 #include "PreCompiled.h"
 
 #ifndef _PreComp_
-# ifdef _MSC_VER
-#  define _USE_MATH_DEFINES
-#  include <cmath>
-# endif
 # include <QAction>
 # include <QMenu>
 #endif
@@ -111,23 +107,13 @@ void ViewProviderAttachExtension::extensionSetupContextMenu(QMenu* menu, QObject
     }
 }
 
-void ViewProviderAttachExtension::showAttachmentEditor()
+void ViewProviderAttachExtension::showAttachmentEditor(std::function<void()> onAccept, std::function<void()> onReject)
 {
-    // See PropertyEnumAttacherItem::openTask()
-    Gui::TaskView::TaskDialog* dlg = Gui::Control().activeDialog();
-    TaskDlgAttacher* task;
-    task = qobject_cast<TaskDlgAttacher*>(dlg);
-
-    if (dlg && !task) {
-        // there is already another task dialog which must be closed first
-        Gui::Control().showDialog(dlg);
-        return;
+    if (Gui::Control().activeDialog()) {
+        Gui::Control().closeDialog();
     }
 
-    if (!task) {
-        task = new TaskDlgAttacher(getExtendedViewProvider());
-    }
-
+    TaskDlgAttacher* task = new TaskDlgAttacher(getExtendedViewProvider(), true, onAccept, onReject);
     Gui::Control().showDialog(task);
 }
 

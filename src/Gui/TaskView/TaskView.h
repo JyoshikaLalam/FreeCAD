@@ -28,7 +28,7 @@
 #include <QScrollArea>
 
 #include <Gui/QSint/include/QSint>
-#include <Gui/Selection.h>
+#include <Gui/Selection/Selection.h>
 #include "TaskWatcher.h"
 
 
@@ -37,6 +37,7 @@ class Property;
 }
 
 namespace Gui {
+class MDIView;
 class ControlSingleton;
 namespace DockWnd{
 class ComboView;
@@ -137,7 +138,7 @@ public:
   * This elements get injected mostly by the ViewProvider classes of the selected
   * DocumentObjects. 
   */
-class GuiExport TaskView : public QScrollArea, public Gui::SelectionSingleton::ObserverType
+class GuiExport TaskView : public QWidget, public Gui::SelectionSingleton::ObserverType
 {
     Q_OBJECT
 
@@ -183,9 +184,12 @@ private:
     void tryRestoreWidth();
     void slotActiveDocument(const App::Document&);
     void slotDeletedDocument(const App::Document&);
+    void slotViewClosed(const Gui::MDIView*);
     void slotUndoDocument(const App::Document&);
     void slotRedoDocument(const App::Document&);
-    void transactionChangeOnDocument(const App::Document&);
+    void transactionChangeOnDocument(const App::Document&, bool undo);
+    QVBoxLayout* mainLayout;
+    QScrollArea* scrollArea;
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -210,6 +214,7 @@ protected:
 
     Connection connectApplicationActiveDocument;
     Connection connectApplicationDeleteDocument;
+    Connection connectApplicationClosedView;
     Connection connectApplicationUndoDocument;
     Connection connectApplicationRedoDocument;
 };

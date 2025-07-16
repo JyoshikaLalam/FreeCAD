@@ -9,7 +9,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>580</width>
+    <width>640</width>
     <height>691</height>
    </rect>
   </property>
@@ -512,22 +512,22 @@
            </item>
            <item>
             <property name="text">
-             <string>CC-BY</string>
+             <string notr="true">CC-BY</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>CC-BY-SA</string>
+             <string notr="true">CC-BY-SA</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>CC-BY-NC</string>
+             <string notr="true">CC-BY-NC</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>CC-BY-SA-NC</string>
+             <string notr="true">CC-BY-SA-NC</string>
             </property>
            </item>
            <item>

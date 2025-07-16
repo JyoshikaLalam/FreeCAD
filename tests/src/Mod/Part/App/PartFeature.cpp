@@ -24,7 +24,7 @@ protected:
     void SetUp() override
     {
         createTestDoc();
-        _common = dynamic_cast<Common*>(_doc->addObject("Part::Common"));
+        _common = _doc->addObject<Common>();
     }
 
     void TearDown() override
@@ -53,11 +53,7 @@ TEST_F(FeaturePartTest, testGetElementName)
     EXPECT_STREQ(namePairExport.oldName.c_str(), "test");
     EXPECT_STREQ(namePairSelf.newName.c_str(), "");
     EXPECT_STREQ(namePairSelf.oldName.c_str(), "");
-#ifndef FC_USE_TNP_FIX
-    EXPECT_EQ(ts.getElementMap().size(), 0);
-#else
     EXPECT_EQ(ts.getElementMap().size(), 26);
-#endif
     // TBD
 }
 
@@ -115,7 +111,7 @@ TEST_F(FeaturePartTest, create)
     // without modifications
     EXPECT_STREQ(_doc->getObjectName(featureNoDoc), "Vertex");
 
-    // The feature is created in otherDoc, which doesn't have other features and thertherefor the
+    // The feature is created in otherDoc, which doesn't have other features and thertherefore the
     // feature's name will be assigned without modifications
     EXPECT_STREQ(otherDoc->getObjectName(feature), "Vertex");
 
@@ -166,14 +162,10 @@ TEST_F(FeaturePartTest, getRelatedElements)
                                                HistoryTraceType::followTypeChange,
                                                true);
     // Assert
-#ifdef FC_USE_TNP_FIX
     EXPECT_EQ(result.size(), 1);   // Found the one.
     EXPECT_EQ(result2.size(), 0);  // No element map, so no related elements
     // The results are always going to vary, so we can't test for specific values:
     // EXPECT_STREQ(result.front().name.toString().c_str(),"Edge3;:M;CMN;:H38d:7,E");
-#else
-    EXPECT_EQ(result.size(), 0);
-#endif
 }
 
 // Note that this test is pretty trivial and useless .. but the method in question is never

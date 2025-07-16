@@ -60,6 +60,8 @@ public:
 
     /// Keep a copy of suppressed shapes so that we can restore them (and maybe display them)
     Part::PropertyPartShape SuppressedShape;
+    /// Keep a copy of the placement before suppression to restore it back when unsuppressed, fix #20205
+    Base::Placement SuppressedPlacement;
     App::DocumentObjectExecReturn* recompute() override;
 
     short mustExecute() const override;
@@ -99,18 +101,21 @@ protected:
     /**
      * Get a solid of the given shape. If no solid is found an exception is raised.
      */
-    // TODO: Toponaming April 2024 Deprecated in favor of TopoShape method.  Remove when possible.
-    TopoDS_Shape getSolid(const TopoDS_Shape&);
-    TopoShape getSolid(const TopoShape&);
+    TopoShape getSolid(const TopoShape&) const;
     static int countSolids(const TopoDS_Shape&, TopAbs_ShapeEnum type = TopAbs_SOLID);
 
     /**
      * Checks if the single-solid body rule is fulfilled.
      */
     bool isSingleSolidRuleSatisfied(const TopoDS_Shape&, TopAbs_ShapeEnum type = TopAbs_SOLID);
-    SingleSolidRuleMode singleSolidRuleMode();
+    SingleSolidRuleMode singleSolidRuleMode() const;
 
     void updateSuppressedShape();
+
+    /**
+     * Set the Material To Body Material object
+     */
+    void setMaterialToBodyMaterial();
 
     /// Grab any point from the given face
     static const gp_Pnt getPointFromFace(const TopoDS_Face& f);

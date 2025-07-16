@@ -195,7 +195,7 @@ void StdCmdLinkMakeGroup::activated(int option) {
         QMessageBox::critical(getMainWindow(), QObject::tr("Create link group failed"),
             QString::fromLatin1(e.what()));
         Command::abortCommand();
-        e.ReportException();
+        e.reportException();
     }
 }
 
@@ -260,7 +260,7 @@ void StdCmdLinkMake::activated(int) {
         Command::abortCommand();
         QMessageBox::critical(getMainWindow(), QObject::tr("Create link failed"),
             QString::fromLatin1(e.what()));
-        e.ReportException();
+        e.reportException();
     }
 }
 
@@ -302,7 +302,7 @@ void StdCmdLinkMakeRelative::activated(int) {
             auto element = Data::findElementName(sel.SubName);
             auto &info = linkInfo[key];
             info.first = sel.pResolvedObject;
-            if(element && element[0])
+            if(!Base::Tools::isNullOrEmpty(element))
                 info.second.emplace_back(element);
         }
 
@@ -335,7 +335,7 @@ void StdCmdLinkMakeRelative::activated(int) {
         Command::abortCommand();
         QMessageBox::critical(getMainWindow(), QObject::tr("Failed to create relative link"),
             QString::fromLatin1(e.what()));
-        e.ReportException();
+        e.reportException();
     }
     return;
 }
@@ -398,12 +398,12 @@ static void linkConvert(bool unlink) {
         for(auto &v : infos) {
             auto &info = v.second;
             auto parent = info.parent.getObject();
-            auto parentVp = Base::freecad_dynamic_cast<ViewProviderDocumentObject>(
+            auto parentVp = freecad_cast<ViewProviderDocumentObject*>(
                     Application::Instance->getViewProvider(parent));
             auto obj = info.obj.getObject();
             if(!parent || !obj || !parentVp)
                 continue;
-            if(!recomputeSet.count(parent))
+            if(!recomputeSet.contains(parent))
                 recomputeSet.emplace(parent,parent);
             auto doc = parent->getDocument();
             App::DocumentObject *replaceObj;
@@ -413,12 +413,12 @@ static void linkConvert(bool unlink) {
                     continue;
             }else{
                 auto name = doc->getUniqueObjectName("Link");
-                auto link = static_cast<App::Link*>(doc->addObject("App::Link",name.c_str()));
+                auto link = doc->addObject<App::Link>(name.c_str());
                 if(!link)
                     FC_THROWM(Base::RuntimeError,"Failed to create link");
                 link->setLink(-1,obj);
                 link->Label.setValue(obj->Label.getValue());
-                auto pla = Base::freecad_dynamic_cast<App::PropertyPlacement>(
+                auto pla = freecad_cast<App::PropertyPlacement*>(
                         obj->getPropertyByName("Placement"));
                 if(pla)
                     link->Placement.setValue(pla->getValue());
@@ -463,7 +463,7 @@ static void linkConvert(bool unlink) {
         Command::abortCommand();
         auto title = unlink?QObject::tr("Unlink failed"):QObject::tr("Replace link failed");
         QMessageBox::critical(getMainWindow(), title, QString::fromLatin1(e.what()));
-        e.ReportException();
+        e.reportException();
         return;
     }
 }
@@ -593,7 +593,7 @@ void StdCmdLinkImport::activated(int) {
         Command::abortCommand();
         QMessageBox::critical(getMainWindow(), QObject::tr("Failed to import links"),
             QString::fromLatin1(e.what()));
-        e.ReportException();
+        e.reportException();
     }
 }
 
@@ -633,7 +633,7 @@ void StdCmdLinkImportAll::activated(int) {
         QMessageBox::critical(getMainWindow(), QObject::tr("Failed to import all links"),
             QString::fromLatin1(e.what()));
         Command::abortCommand();
-        e.ReportException();
+        e.reportException();
     }
 }
 
@@ -646,7 +646,7 @@ StdCmdLinkSelectLinked::StdCmdLinkSelectLinked()
   : Command("Std_LinkSelectLinked")
 {
     sGroup        = "Link";
-    sMenuText     = QT_TR_NOOP("Go to linked object");
+    sMenuText     = QT_TR_NOOP("&Go to linked object");
     sToolTipText  = QT_TR_NOOP("Select the linked object and switch to its owner document");
     sWhatsThis    = "Std_LinkSelectLinked";
     sStatusTip    = sToolTipText;
@@ -662,7 +662,7 @@ static App::DocumentObject *getSelectedLink(bool finalLink, std::string *subname
     auto sobj = sels[0].pObject->getSubObject(sels[0].SubName);
     if(!sobj)
         return nullptr;
-    auto vp = Base::freecad_dynamic_cast<ViewProviderDocumentObject>(
+    auto vp = freecad_cast<ViewProviderDocumentObject*>(
             Application::Instance->getViewProvider(sobj));
     if(!vp)
         return nullptr;
@@ -755,7 +755,7 @@ void StdCmdLinkSelectLinked::activated(int)
         Selection().addSelection(linked->getDocument()->getName(),linked->getNameInDocument(),subname.c_str());
         auto doc = Application::Instance->getDocument(linked->getDocument());
         if(doc) {
-            auto vp = dynamic_cast<ViewProviderDocumentObject*>(Application::Instance->getViewProvider(linked));
+            auto vp = freecad_cast<ViewProviderDocumentObject*>(Application::Instance->getViewProvider(linked));
             doc->setActiveView(vp);
         }
     } else {
@@ -774,7 +774,7 @@ StdCmdLinkSelectLinkedFinal::StdCmdLinkSelectLinkedFinal()
   : Command("Std_LinkSelectLinkedFinal")
 {
     sGroup        = "Link";
-    sMenuText     = QT_TR_NOOP("Go to the deepest linked object");
+    sMenuText     = QT_TR_NOOP("Go to the &deepest linked object");
     sToolTipText  = QT_TR_NOOP("Select the deepest linked object and switch to its owner document");
     sWhatsThis    = "Std_LinkSelectLinkedFinal";
     sStatusTip    = sToolTipText;
@@ -809,7 +809,7 @@ StdCmdLinkSelectAllLinks::StdCmdLinkSelectAllLinks()
   : Command("Std_LinkSelectAllLinks")
 {
     sGroup        = "Link";
-    sMenuText     = QT_TR_NOOP("Select all links");
+    sMenuText     = QT_TR_NOOP("Select &all links");
     sToolTipText  = QT_TR_NOOP("Select all links to the current selected object");
     sWhatsThis    = "Std_LinkSelectAllLinks";
     sStatusTip    = sToolTipText;
@@ -849,7 +849,7 @@ public:
         : GroupCommand("Std_LinkSelectActions")
     {
         sGroup        = "View";
-        sMenuText     = QT_TR_NOOP("Link navigation");
+        sMenuText     = QT_TR_NOOP("&Link navigation");
         sToolTipText  = QT_TR_NOOP("Link navigation actions");
         sWhatsThis    = "Std_LinkSelectActions";
         sStatusTip    = QT_TR_NOOP("Link navigation actions");
@@ -877,7 +877,7 @@ public:
         sGroup        = "View";
         sMenuText     = QT_TR_NOOP("Link actions");
         sToolTipText  = QT_TR_NOOP("Actions that apply to link objects");
-        sWhatsThis    = "Std_LinkMakeRelative";
+        sWhatsThis    = "Std_LinkActions";
         sStatusTip    = QT_TR_NOOP("Actions that apply to link objects");
         eType         = AlterDoc;
         bCanLog       = false;

@@ -25,12 +25,13 @@
 #ifndef _PreComp_
 #include <QAction>
 #include <QMessageBox>
+#include <limits>
 #include <sstream>
 #endif
 
 #include <App/Document.h>
 #include <Gui/Command.h>
-#include <Gui/SelectionObject.h>
+#include <Gui/Selection/SelectionObject.h>
 #include <Mod/Fem/App/FemConstraintRigidBody.h>
 #include <Mod/Part/App/PartFeature.h>
 
@@ -48,13 +49,14 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
     QWidget* parent)
     : TaskFemConstraintOnBoundary(ConstraintView, parent, "FEM_ConstraintRigidBody")
 {  // Note change "RigidBody" in line above to new constraint name
+    constexpr float floatMax = std::numeric_limits<float>::max();
     proxy = new QWidget(this);
     ui = new Ui_TaskFemConstraintRigidBody();
     ui->setupUi(proxy);
     QMetaObject::connectSlotsByName(this);
 
     // create a context menu for the listview of the references
-    createDeleteAction(ui->lw_references);
+    createActions(ui->lw_references);
     deleteAction->connect(deleteAction,
                           &QAction::triggered,
                           this,
@@ -109,14 +111,14 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
 
     /* Note: */
     // Get the feature data
-    auto pcConstraint = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject());
+    auto pcConstraint = ConstraintView->getObject<Fem::ConstraintRigidBody>();
 
     const Base::Vector3d& refNode = pcConstraint->ReferenceNode.getValue();
     const Base::Vector3d& disp = pcConstraint->Displacement.getValue();
     Base::Vector3d rotDir;
     double rotAngleRad;
     pcConstraint->Rotation.getValue().getValue(rotDir, rotAngleRad);
-    Base::Quantity rotAngle(rotAngleRad, QString::fromUtf8("rad"));
+    Base::Quantity rotAngle(rotAngleRad, "rad");
     Base::Quantity forceX = pcConstraint->ForceX.getQuantityValue();
     Base::Quantity forceY = pcConstraint->ForceY.getQuantityValue();
     Base::Quantity forceZ = pcConstraint->ForceZ.getQuantityValue();
@@ -137,12 +139,12 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
         App::ObjectIdentifier::parse(pcConstraint, std::string("ReferenceNode.y")));
     ui->qsb_ref_node_z->bind(
         App::ObjectIdentifier::parse(pcConstraint, std::string("ReferenceNode.z")));
-    ui->qsb_ref_node_x->setMinimum(-FLOAT_MAX);
-    ui->qsb_ref_node_x->setMaximum(FLOAT_MAX);
-    ui->qsb_ref_node_y->setMinimum(-FLOAT_MAX);
-    ui->qsb_ref_node_y->setMaximum(FLOAT_MAX);
-    ui->qsb_ref_node_z->setMinimum(-FLOAT_MAX);
-    ui->qsb_ref_node_z->setMaximum(FLOAT_MAX);
+    ui->qsb_ref_node_x->setMinimum(-floatMax);
+    ui->qsb_ref_node_x->setMaximum(floatMax);
+    ui->qsb_ref_node_y->setMinimum(-floatMax);
+    ui->qsb_ref_node_y->setMaximum(floatMax);
+    ui->qsb_ref_node_z->setMinimum(-floatMax);
+    ui->qsb_ref_node_z->setMaximum(floatMax);
 
     ui->qsb_disp_x->setValue(disp.x);
     ui->qsb_disp_y->setValue(disp.y);
@@ -150,12 +152,12 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
     ui->qsb_disp_x->bind(App::ObjectIdentifier::parse(pcConstraint, std::string("Displacement.x")));
     ui->qsb_disp_y->bind(App::ObjectIdentifier::parse(pcConstraint, std::string("Displacement.y")));
     ui->qsb_disp_z->bind(App::ObjectIdentifier::parse(pcConstraint, std::string("Displacement.z")));
-    ui->qsb_disp_x->setMinimum(-FLOAT_MAX);
-    ui->qsb_disp_x->setMaximum(FLOAT_MAX);
-    ui->qsb_disp_y->setMinimum(-FLOAT_MAX);
-    ui->qsb_disp_y->setMaximum(FLOAT_MAX);
-    ui->qsb_disp_z->setMinimum(-FLOAT_MAX);
-    ui->qsb_disp_z->setMaximum(FLOAT_MAX);
+    ui->qsb_disp_x->setMinimum(-floatMax);
+    ui->qsb_disp_x->setMaximum(floatMax);
+    ui->qsb_disp_y->setMinimum(-floatMax);
+    ui->qsb_disp_y->setMaximum(floatMax);
+    ui->qsb_disp_z->setMinimum(-floatMax);
+    ui->qsb_disp_z->setMaximum(floatMax);
 
     ui->spb_rot_axis_x->setValue(rotDir.x);
     ui->spb_rot_axis_y->setValue(rotDir.y);
@@ -169,14 +171,14 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
         App::ObjectIdentifier::parse(pcConstraint, std::string("Rotation.Axis.z")));
     ui->qsb_rot_angle->bind(
         App::ObjectIdentifier::parse(pcConstraint, std::string("Rotation.Angle")));
-    ui->spb_rot_axis_x->setMinimum(-FLOAT_MAX);
-    ui->spb_rot_axis_x->setMaximum(FLOAT_MAX);
-    ui->spb_rot_axis_y->setMinimum(-FLOAT_MAX);
-    ui->spb_rot_axis_y->setMaximum(FLOAT_MAX);
-    ui->spb_rot_axis_z->setMinimum(-FLOAT_MAX);
-    ui->spb_rot_axis_z->setMaximum(FLOAT_MAX);
-    ui->qsb_rot_angle->setMinimum(-FLOAT_MAX);
-    ui->qsb_rot_angle->setMaximum(FLOAT_MAX);
+    ui->spb_rot_axis_x->setMinimum(-floatMax);
+    ui->spb_rot_axis_x->setMaximum(floatMax);
+    ui->spb_rot_axis_y->setMinimum(-floatMax);
+    ui->spb_rot_axis_y->setMaximum(floatMax);
+    ui->spb_rot_axis_z->setMinimum(-floatMax);
+    ui->spb_rot_axis_z->setMaximum(floatMax);
+    ui->qsb_rot_angle->setMinimum(-floatMax);
+    ui->qsb_rot_angle->setMaximum(floatMax);
 
     ui->qsb_force_x->setValue(forceX);
     ui->qsb_force_y->setValue(forceY);
@@ -184,12 +186,12 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
     ui->qsb_force_x->bind(pcConstraint->ForceX);
     ui->qsb_force_y->bind(pcConstraint->ForceY);
     ui->qsb_force_z->bind(pcConstraint->ForceZ);
-    ui->qsb_force_x->setMinimum(-FLOAT_MAX);
-    ui->qsb_force_x->setMaximum(FLOAT_MAX);
-    ui->qsb_force_y->setMinimum(-FLOAT_MAX);
-    ui->qsb_force_y->setMaximum(FLOAT_MAX);
-    ui->qsb_force_z->setMinimum(-FLOAT_MAX);
-    ui->qsb_force_z->setMaximum(FLOAT_MAX);
+    ui->qsb_force_x->setMinimum(-floatMax);
+    ui->qsb_force_x->setMaximum(floatMax);
+    ui->qsb_force_y->setMinimum(-floatMax);
+    ui->qsb_force_y->setMaximum(floatMax);
+    ui->qsb_force_z->setMinimum(-floatMax);
+    ui->qsb_force_z->setMaximum(floatMax);
 
     ui->qsb_moment_x->setValue(momentX);
     ui->qsb_moment_y->setValue(momentY);
@@ -197,12 +199,12 @@ TaskFemConstraintRigidBody::TaskFemConstraintRigidBody(
     ui->qsb_moment_x->bind(pcConstraint->MomentX);
     ui->qsb_moment_y->bind(pcConstraint->MomentY);
     ui->qsb_moment_z->bind(pcConstraint->MomentZ);
-    ui->qsb_moment_x->setMinimum(-FLOAT_MAX);
-    ui->qsb_moment_x->setMaximum(FLOAT_MAX);
-    ui->qsb_moment_y->setMinimum(-FLOAT_MAX);
-    ui->qsb_moment_y->setMaximum(FLOAT_MAX);
-    ui->qsb_moment_z->setMinimum(-FLOAT_MAX);
-    ui->qsb_moment_z->setMaximum(FLOAT_MAX);
+    ui->qsb_moment_x->setMinimum(-floatMax);
+    ui->qsb_moment_x->setMaximum(floatMax);
+    ui->qsb_moment_y->setMinimum(-floatMax);
+    ui->qsb_moment_y->setMaximum(floatMax);
+    ui->qsb_moment_z->setMinimum(-floatMax);
+    ui->qsb_moment_z->setMaximum(floatMax);
 
     QStringList modeList;
 
@@ -273,8 +275,7 @@ void TaskFemConstraintRigidBody::addToSelection()
         QMessageBox::warning(this, tr("Selection error"), tr("Nothing selected!"));
         return;
     }
-    Fem::ConstraintRigidBody* pcConstraint =
-        static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject());
+    Fem::ConstraintRigidBody* pcConstraint = ConstraintView->getObject<Fem::ConstraintRigidBody>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
 
@@ -290,8 +291,7 @@ void TaskFemConstraintRigidBody::addToSelection()
         for (size_t subIt = 0; subIt < (subNames.size());
              ++subIt) {  // for every selected sub element
             bool addMe = true;
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subNames[subIt]);
+            for (auto itr = std::ranges::find(SubElements, subNames[subIt]);
                  itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
@@ -347,8 +347,7 @@ void TaskFemConstraintRigidBody::removeFromSelection()
         QMessageBox::warning(this, tr("Selection error"), tr("Nothing selected!"));
         return;
     }
-    Fem::ConstraintRigidBody* pcConstraint =
-        static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject());
+    Fem::ConstraintRigidBody* pcConstraint = ConstraintView->getObject<Fem::ConstraintRigidBody>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
     std::vector<size_t> itemsToDel;
@@ -363,8 +362,7 @@ void TaskFemConstraintRigidBody::removeFromSelection()
 
         for (size_t subIt = 0; subIt < (subNames.size());
              ++subIt) {  // for every selected sub element
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subNames[subIt]);
+            for (auto itr = std::ranges::find(SubElements, subNames[subIt]);
                  itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
@@ -405,7 +403,7 @@ void TaskFemConstraintRigidBody::onReferenceDeleted()
 
 void TaskFemConstraintRigidBody::onRotModeXChanged(int item)
 {
-    const char* val = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject())
+    const char* val = ConstraintView->getObject<Fem::ConstraintRigidBody>()
                           ->RotationalModeX.getEnumVector()[item]
                           .c_str();
 
@@ -424,7 +422,7 @@ void TaskFemConstraintRigidBody::onRotModeXChanged(int item)
 }
 void TaskFemConstraintRigidBody::onRotModeYChanged(int item)
 {
-    const char* val = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject())
+    const char* val = ConstraintView->getObject<Fem::ConstraintRigidBody>()
                           ->RotationalModeY.getEnumVector()[item]
                           .c_str();
 
@@ -443,7 +441,7 @@ void TaskFemConstraintRigidBody::onRotModeYChanged(int item)
 }
 void TaskFemConstraintRigidBody::onRotModeZChanged(int item)
 {
-    const char* val = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject())
+    const char* val = ConstraintView->getObject<Fem::ConstraintRigidBody>()
                           ->RotationalModeZ.getEnumVector()[item]
                           .c_str();
 
@@ -463,7 +461,7 @@ void TaskFemConstraintRigidBody::onRotModeZChanged(int item)
 
 void TaskFemConstraintRigidBody::onTransModeXChanged(int item)
 {
-    const char* val = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject())
+    const char* val = ConstraintView->getObject<Fem::ConstraintRigidBody>()
                           ->TranslationalModeX.getEnumVector()[item]
                           .c_str();
 
@@ -482,7 +480,7 @@ void TaskFemConstraintRigidBody::onTransModeXChanged(int item)
 }
 void TaskFemConstraintRigidBody::onTransModeYChanged(int item)
 {
-    const char* val = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject())
+    const char* val = ConstraintView->getObject<Fem::ConstraintRigidBody>()
                           ->TranslationalModeY.getEnumVector()[item]
                           .c_str();
 
@@ -501,7 +499,7 @@ void TaskFemConstraintRigidBody::onTransModeYChanged(int item)
 }
 void TaskFemConstraintRigidBody::onTransModeZChanged(int item)
 {
-    const char* val = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject())
+    const char* val = ConstraintView->getObject<Fem::ConstraintRigidBody>()
                           ->TranslationalModeZ.getEnumVector()[item]
                           .c_str();
 
@@ -521,7 +519,7 @@ void TaskFemConstraintRigidBody::onTransModeZChanged(int item)
 
 void TaskFemConstraintRigidBody::onRefNodeXChanged(double value)
 {
-    auto obj = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject());
+    auto obj = ConstraintView->getObject<Fem::ConstraintRigidBody>();
     Base::Vector3d refNode = obj->ReferenceNode.getValue();
     refNode.x = value;
     obj->ReferenceNode.setValue(refNode);
@@ -529,7 +527,7 @@ void TaskFemConstraintRigidBody::onRefNodeXChanged(double value)
 
 void TaskFemConstraintRigidBody::onRefNodeYChanged(double value)
 {
-    auto obj = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject());
+    auto obj = ConstraintView->getObject<Fem::ConstraintRigidBody>();
     Base::Vector3d refNode = obj->ReferenceNode.getValue();
     refNode.y = value;
     obj->ReferenceNode.setValue(refNode);
@@ -537,7 +535,7 @@ void TaskFemConstraintRigidBody::onRefNodeYChanged(double value)
 
 void TaskFemConstraintRigidBody::onRefNodeZChanged(double value)
 {
-    auto obj = static_cast<Fem::ConstraintRigidBody*>(ConstraintView->getObject());
+    auto obj = ConstraintView->getObject<Fem::ConstraintRigidBody>();
     Base::Vector3d refNode = obj->ReferenceNode.getValue();
     refNode.z = value;
     obj->ReferenceNode.setValue(refNode);
@@ -583,18 +581,18 @@ Base::Rotation TaskFemConstraintRigidBody::getRotation() const
 
 std::vector<std::string> TaskFemConstraintRigidBody::getForce() const
 {
-    std::string x = ui->qsb_force_x->value().getSafeUserString().toStdString();
-    std::string y = ui->qsb_force_y->value().getSafeUserString().toStdString();
-    std::string z = ui->qsb_force_z->value().getSafeUserString().toStdString();
+    std::string x = ui->qsb_force_x->value().getSafeUserString();
+    std::string y = ui->qsb_force_y->value().getSafeUserString();
+    std::string z = ui->qsb_force_z->value().getSafeUserString();
 
     return {x, y, z};
 }
 
 std::vector<std::string> TaskFemConstraintRigidBody::getMoment() const
 {
-    std::string x = ui->qsb_moment_x->value().getSafeUserString().toStdString();
-    std::string y = ui->qsb_moment_y->value().getSafeUserString().toStdString();
-    std::string z = ui->qsb_moment_z->value().getSafeUserString().toStdString();
+    std::string x = ui->qsb_moment_x->value().getSafeUserString();
+    std::string y = ui->qsb_moment_y->value().getSafeUserString();
+    std::string z = ui->qsb_moment_z->value().getSafeUserString();
 
     return std::vector<std::string>({x, y, z});
 }

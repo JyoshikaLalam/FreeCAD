@@ -31,6 +31,7 @@
 #include <Gui/Application.h>
 #include <Gui/Control.h>
 #include <Gui/Command.h>
+#include <Gui/MainWindow.h>
 #include <Mod/PartDesign/App/FeatureHole.h>
 #include <Mod/Sketcher/App/SketchObject.h>
 
@@ -51,7 +52,7 @@ ViewProviderHole::~ViewProviderHole() = default;
 std::vector<App::DocumentObject*> ViewProviderHole::claimChildren()const
 {
     std::vector<App::DocumentObject*> temp;
-    temp.push_back(static_cast<PartDesign::Hole*>(getObject())->Profile.getValue());
+    temp.push_back(getObject<PartDesign::Hole>()->Profile.getValue());
 
     return temp;
 }
@@ -73,7 +74,7 @@ bool ViewProviderHole::setEdit(int ModNum)
         if (holeDlg && holeDlg->getViewObject() != this)
             holeDlg = nullptr; // another hole left open its task panel
         if (dlg && !holeDlg) {
-            QMessageBox msgBox;
+            QMessageBox msgBox(Gui::getMainWindow());
             msgBox.setText(QObject::tr("A dialog is already open in the task panel"));
             msgBox.setInformativeText(QObject::tr("Do you want to close this dialog?"));
             msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
@@ -107,7 +108,7 @@ bool ViewProviderHole::setEdit(int ModNum)
 bool ViewProviderHole::onDelete(const std::vector<std::string> &s)
 {
     // get the Sketch
-    PartDesign::Hole* pcHole = static_cast<PartDesign::Hole*>(getObject());
+    PartDesign::Hole* pcHole = getObject<PartDesign::Hole>();
     Sketcher::SketchObject *pcSketch = nullptr;
     if (pcHole->Profile.getValue())
         pcSketch = static_cast<Sketcher::SketchObject*>(pcHole->Profile.getValue());

@@ -24,6 +24,7 @@
 
 #ifndef _PreComp_
 # include <cmath>
+# include <limits>
 # include <sstream>
 # include <Standard_Failure.hxx>
 # include <Precision.hxx>
@@ -42,8 +43,9 @@
 #include "DrawUtil.h"
 #include "DrawViewClip.h"
 #include "DrawViewCollection.h"
+#include "DrawProjGroup.h"
+#include "DrawProjGroupItem.h"
 #include "Preferences.h"
-
 
 using namespace TechDraw;
 using DU = DrawUtil;
@@ -64,7 +66,7 @@ using DU = DrawUtil;
     QT_TRANSLATE_NOOP("DrawViewAnnotation", "Annotation");
     QT_TRANSLATE_NOOP("DrawViewImage", "Image");
     QT_TRANSLATE_NOOP("DrawViewSymbol", "Symbol");
-    QT_TRANSLATE_NOOP("DrawViewArch", "Arch");
+    QT_TRANSLATE_NOOP("DrawViewArch", "BIM");
     QT_TRANSLATE_NOOP("DrawViewDraft", "Draft");
     QT_TRANSLATE_NOOP("DrawLeaderLine", "LeaderLine");
     QT_TRANSLATE_NOOP("DrawViewBalloon", "Balloon");
@@ -113,7 +115,7 @@ DrawView::~DrawView()
 
 App::DocumentObjectExecReturn *DrawView::execute()
 {
-//    Base::Console().Message("DV::execute() - %s touched: %d\n", getNameInDocument(), isTouched());
+//    Base::Console().message("DV::execute() - %s touched: %d\n", getNameInDocument(), isTouched());
     if (!findParentPage()) {
         return App::DocumentObject::execute();
     }
@@ -129,7 +131,7 @@ void DrawView::checkScale()
     TechDraw::DrawPage *page = findParentPage();
     if(page) {
         if (ScaleType.isValue("Page")) {
-            if(std::abs(page->Scale.getValue() - Scale.getValue()) > FLT_EPSILON) {
+            if(std::abs(page->Scale.getValue() - Scale.getValue()) > std::numeric_limits<float>::epsilon()) {
                 Scale.setValue(page->Scale.getValue());
                 Scale.purgeTouched();
             }
@@ -189,7 +191,7 @@ void DrawView::onChanged(const App::Property* prop)
         }
         if (ScaleType.isValue("Page")) {
             Scale.setStatus(App::Property::ReadOnly, true);
-            if(std::abs(page->Scale.getValue() - getScale()) > FLT_EPSILON) {
+            if(std::abs(page->Scale.getValue() - getScale()) > std::numeric_limits<float>::epsilon()) {
                Scale.setValue(page->Scale.getValue());
             }
         } else if ( ScaleType.isValue("Custom") ) {
@@ -199,7 +201,7 @@ void DrawView::onChanged(const App::Property* prop)
             Scale.setStatus(App::Property::ReadOnly, true);
             if (!checkFit(page)) {
                 double newScale = autoScale(page->getPageWidth(), page->getPageHeight());
-                if(std::abs(newScale - getScale()) > FLT_EPSILON) {           //stops onChanged/execute loop
+                if(std::abs(newScale - getScale()) > std::numeric_limits<float>::epsilon()) {
                     Scale.setValue(newScale);
                 }
             }
@@ -437,11 +439,31 @@ DrawView *DrawView::claimParent() const
     return getCollection();
 }
 
+//! return *unique* list of DrawView derived items which consider this DVP to be their 'owner'
+//! if a dimension has two references to this dvp, it will appear twice in the inlist, so we need to
+//! pick out duplicates.
+std::vector<DrawView*> DrawView::getUniqueChildren() const
+{
+    std::vector<DrawView*> result;
+    auto children = getInList();
+    std::sort(children.begin(), children.end(), std::less<>());
+    auto newEnd = std::unique(children.begin(), children.end());
+    children.erase(newEnd, children.end());
+    for (auto& child : children) {
+        auto* childDV = freecad_cast<DrawView*>(child);
+        if (childDV && childDV->claimParent() == this) {
+            result.push_back(childDV);
+        }
+    }
+    return result;
+}
+
+
 DrawViewClip* DrawView::getClipGroup()
 {
     for (auto* obj : getInList()) {
         if (obj->isDerivedFrom<DrawViewClip>()) {
-            return dynamic_cast<DrawViewClip*>(obj);
+            return static_cast<DrawViewClip*>(obj);
         }
     }
     return nullptr;
@@ -451,7 +473,7 @@ DrawViewCollection *DrawView::getCollection() const
 {
     for (auto* obj : getInList()) {
         if (obj->isDerivedFrom<DrawViewCollection>()) {
-            return dynamic_cast<DrawViewCollection*>(obj);
+            return static_cast<DrawViewCollection*>(obj);
         }
     }
     return nullptr;
@@ -468,8 +490,7 @@ double DrawView::autoScale() const
 //compare 1:1 rect of view to pagesize(pw, h)
 double DrawView::autoScale(double pw, double ph) const
 {
-//    Base::Console().Message("DV::autoScale(Page: %.3f, %.3f) - %s\n", pw, ph, getNameInDocument());
-    double fudgeFactor = 1.0;  //make it a bit smaller just in case.
+//    Base::Console().message("DV::autoScale(Page: %.3f, %.3f) - %s\n", pw, ph, getNameInDocument());
     QRectF viewBox = getRect();           //getRect is scaled (ie current actual size)
     if (!viewBox.isValid()) {
         return 1.0;
@@ -479,14 +500,14 @@ double DrawView::autoScale(double pw, double ph) const
     double vbh = viewBox.height()/getScale();
     double xScale = pw/vbw;           // > 1 page bigger than figure
     double yScale = ph/vbh;           // < 1 page is smaller than figure
-    double newScale = std::min(xScale, yScale) * fudgeFactor;
+    double newScale = std::min(xScale, yScale);
     double sensibleScale = DrawUtil::sensibleScale(newScale);
     return sensibleScale;
 }
 
 bool DrawView::checkFit() const
 {
-//    Base::Console().Message("DV::checkFit() - %s\n", getNameInDocument());
+//    Base::Console().message("DV::checkFit() - %s\n", getNameInDocument());
     auto page = findParentPage();
     return checkFit(page);
 }
@@ -494,9 +515,8 @@ bool DrawView::checkFit() const
 //!check if View is too big for page
 bool DrawView::checkFit(TechDraw::DrawPage* p) const
 {
-//    Base::Console().Message("DV::checkFit(page) - %s\n", getNameInDocument());
+//    Base::Console().message("DV::checkFit(page) - %s\n", getNameInDocument());
     bool result = true;
-    double fudge = 1.1;
 
     double width = 0.0;
     double height = 0.0;
@@ -506,8 +526,6 @@ bool DrawView::checkFit(TechDraw::DrawPage* p) const
     } else {
         width = viewBox.width();        //scaled rect w x h
         height = viewBox.height();
-        width *= fudge;
-        height *= fudge;
         if ( (width > p->getPageWidth()) ||
              (height > p->getPageHeight()) ) {
             result = false;
@@ -518,7 +536,7 @@ bool DrawView::checkFit(TechDraw::DrawPage* p) const
 
 void DrawView::setPosition(double x, double y, bool force)
 {
-//    Base::Console().Message("DV::setPosition(%.3f, %.3f) - \n", x,y, getNameInDocument());
+//    Base::Console().message("DV::setPosition(%.3f, %.3f) - \n", x,y, getNameInDocument());
     if ( (!isLocked()) ||
          (force) ) {
         double currX = X.getValue();
@@ -554,7 +572,7 @@ std::vector<TechDraw::DrawLeaderLine*> DrawView::getLeaders() const
     std::vector<App::DocumentObject*> children = getInList();
     for (std::vector<App::DocumentObject*>::iterator it = children.begin(); it != children.end(); ++it) {
         if ((*it)->isDerivedFrom<DrawLeaderLine>()) {
-            TechDraw::DrawLeaderLine* lead = dynamic_cast<TechDraw::DrawLeaderLine*>(*it);
+            TechDraw::DrawLeaderLine* lead = static_cast<TechDraw::DrawLeaderLine*>(*it);
             result.push_back(lead);
         }
     }
@@ -576,7 +594,7 @@ void DrawView::handleChangedPropertyType(Base::XMLReader &reader, const char * T
             }
         }
     }
-    else if (prop->isDerivedFrom(App::PropertyLinkList::getClassTypeId())
+    else if (prop->isDerivedFrom<App::PropertyLinkList>()
         && strcmp(prop->getName(), "Source") == 0) {
         App::PropertyLinkGlobal glink;
         App::PropertyLink link;
@@ -635,7 +653,7 @@ void DrawView::handleChangedPropertyType(Base::XMLReader &reader, const char * T
 
 bool DrawView::keepUpdated()
 {
-//    Base::Console().Message("DV::keepUpdated() - %s\n", getNameInDocument());
+//    Base::Console().message("DV::keepUpdated() - %s\n", getNameInDocument());
     if (overrideKeepUpdated()) {
         return true;
     }
@@ -656,6 +674,22 @@ void DrawView::setScaleAttribute()
     }
 }
 
+//! Due to changes made for the "intelligent" view creation tool, testing for a view being an
+//! instance of DrawProjGroupItem is no longer reliable, as views not in a group are sometimes
+//! created as DrawProjGroupItem without belonging to a group.  We now need to test for the
+//! existence of the parent DrawProjGroup
+bool DrawView::isProjGroupItem(DrawViewPart* item)
+{
+    auto dpgi = freecad_cast<DrawProjGroupItem*>(item);
+    if (!dpgi) {
+        return false;
+    }
+    auto group = dpgi->getPGroup();
+    if (!group) {
+        return false;
+    }
+    return true;
+}
 int DrawView::prefScaleType()
 {
     return Preferences::getPreferenceGroup("General")->GetInt("DefaultScaleType", 0);
@@ -674,7 +708,7 @@ double DrawView::prefScale()
 
 void DrawView::requestPaint()
 {
-//    Base::Console().Message("DV::requestPaint() - %s\n", getNameInDocument());
+//    Base::Console().message("DV::requestPaint() - %s\n", getNameInDocument());
     signalGuiPaint(this);
 }
 
@@ -689,11 +723,11 @@ void DrawView::showProgressMessage(std::string featureName, std::string text)
 //! the unique name within the document (ex ActiveView001), and use it to update the Label property.
 void DrawView::translateLabel(std::string context, std::string baseName, std::string uniqueName)
 {
-//    Base::Console().Message("DV::translateLabel - context: %s baseName: %s uniqueName: %s\n",
+//    Base::Console().message("DV::translateLabel - context: %s baseName: %s uniqueName: %s\n",
 //                            context.c_str(), baseName.c_str(), uniqueName.c_str());
 
     Label.setValue(DU::translateArbitrary(context, baseName, uniqueName));
-//    Base::Console().Message("DV::translateLabel - new label: %s\n", Label.getValue());
+//    Base::Console().message("DV::translateLabel - new label: %s\n", Label.getValue());
 }
 
 PyObject *DrawView::getPyObject(void)

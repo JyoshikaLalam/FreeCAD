@@ -132,6 +132,20 @@ def makeConstraintDisplacement(doc, name="ConstraintDisplacement"):
     return obj
 
 
+def makeConstraintElectricChargeDensity(doc, name="ElectricChargeDensity"):
+    """makeConstraintElectricChargeDensity(document, [name]):
+    makes a Fem ElectricChargeDensity object"""
+    obj = doc.addObject("Fem::ConstraintPython", name)
+    from femobjects import constraint_electricchargedensity
+
+    constraint_electricchargedensity.ConstraintElectricChargeDensity(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_constraint_electricchargedensity
+
+        view_constraint_electricchargedensity.VPConstraintElectricChargeDensity(obj.ViewObject)
+    return obj
+
+
 def makeConstraintElectrostaticPotential(doc, name="ConstraintElectrostaticPotential"):
     """makeConstraintElectrostaticPotential(document, [name]):
     makes a Fem ElectrostaticPotential object"""
@@ -351,7 +365,7 @@ def makeElementFluid1D(doc, name="ElementFluid1D"):
 
 
 def makeElementGeometry1D(
-    doc, sectiontype="Rectangular", width=10.0, height=25.0, name="ElementGeometry1D"
+    doc, sectiontype="Rectangular", width=10.0, height=25.0, thickness=2.0, name="ElementGeometry1D"
 ):
     """makeElementGeometry1D(document, [width], [height], [name]):
     creates a 1D geometry element object to define a cross section"""
@@ -359,17 +373,22 @@ def makeElementGeometry1D(
     from femobjects import element_geometry1D
 
     element_geometry1D.ElementGeometry1D(obj)
-    sec_types = element_geometry1D.ElementGeometry1D.known_beam_types
-    if sectiontype not in sec_types:
-        FreeCAD.Console.PrintError("Section type is unknown. Set to " + sec_types[0] + " \n")
-        obj.SectionType = sec_types[0]
-    else:
-        obj.SectionType = sectiontype
+
+    obj.SectionType = sectiontype
     obj.RectWidth = width
     obj.RectHeight = height
     obj.CircDiameter = height
     obj.PipeDiameter = height
-    obj.PipeThickness = width
+    obj.PipeThickness = thickness
+    obj.Axis1Length = width
+    obj.Axis2Length = height
+    obj.BoxHeight = height
+    obj.BoxWidth = width
+    obj.BoxT1 = thickness
+    obj.BoxT2 = thickness
+    obj.BoxT3 = thickness
+    obj.BoxT4 = thickness
+
     if FreeCAD.GuiUp:
         from femviewprovider import view_element_geometry1D
 
@@ -490,7 +509,7 @@ def makeMeshBoundaryLayer(doc, base_mesh, name="MeshBoundaryLayer"):
 def makeMeshGmsh(doc, name="MeshGmsh"):
     """makeMeshGmsh(document, [name]):
     makes a Gmsh FEM mesh object"""
-    obj = doc.addObject("Fem::FemMeshObjectPython", name)
+    obj = doc.addObject("Fem::FemMeshShapeBaseObjectPython", name)
     from femobjects import mesh_gmsh
 
     mesh_gmsh.MeshGmsh(obj)
@@ -525,7 +544,21 @@ def makeMeshGroup(doc, base_mesh, use_label=False, name="MeshGroup"):
 
 def makeMeshNetgen(doc, name="MeshNetgen"):
     """makeMeshNetgen(document, [name]):
-    makes a Fem MeshShapeNetgenObject object"""
+    makes a Netgen FEM mesh object"""
+    obj = doc.addObject("Fem::FemMeshShapeBaseObjectPython", name)
+    from femobjects import mesh_netgen
+
+    mesh_netgen.MeshNetgen(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_mesh_netgen
+
+        view_mesh_netgen.VPMeshNetgen(obj.ViewObject)
+    return obj
+
+
+def makeMeshNetgenLegacy(doc, name="MeshNetgen"):
+    """makeMeshNetgenLegacy(document, [name]):
+    makes a old implementation Netgen FEM mesh object"""
     obj = doc.addObject("Fem::FemMeshShapeNetgenObject", name)
     return obj
 
@@ -584,10 +617,7 @@ def makePostVtkFilterClipRegion(doc, base_vtk_result, name="VtkFilterClipRegion"
     """makePostVtkFilterClipRegion(document, base_vtk_result, [name]):
     creates a FEM post processing region clip filter object (vtk based)"""
     obj = doc.addObject("Fem::FemPostClipFilter", name)
-    tmp_filter_list = base_vtk_result.Filter
-    tmp_filter_list.append(obj)
-    base_vtk_result.Filter = tmp_filter_list
-    del tmp_filter_list
+    base_vtk_result.addObject(obj)
     return obj
 
 
@@ -595,10 +625,7 @@ def makePostVtkFilterClipScalar(doc, base_vtk_result, name="VtkFilterClipScalar"
     """makePostVtkFilterClipScalar(document, base_vtk_result, [name]):
     creates a FEM post processing scalar clip filter object (vtk based)"""
     obj = doc.addObject("Fem::FemPostScalarClipFilter", name)
-    tmp_filter_list = base_vtk_result.Filter
-    tmp_filter_list.append(obj)
-    base_vtk_result.Filter = tmp_filter_list
-    del tmp_filter_list
+    base_vtk_result.addObject(obj)
     return obj
 
 
@@ -606,10 +633,7 @@ def makePostVtkFilterCutFunction(doc, base_vtk_result, name="VtkFilterCutFunctio
     """makePostVtkFilterCutFunction(document, base_vtk_result, [name]):
     creates a FEM post processing cut function filter object (vtk based)"""
     obj = doc.addObject("Fem::FemPostClipFilter", name)
-    tmp_filter_list = base_vtk_result.Filter
-    tmp_filter_list.append(obj)
-    base_vtk_result.Filter = tmp_filter_list
-    del tmp_filter_list
+    base_vtk_result.addObject(obj)
     return obj
 
 
@@ -617,10 +641,7 @@ def makePostVtkFilterWarp(doc, base_vtk_result, name="VtkFilterWarp"):
     """makePostVtkFilterWarp(document, base_vtk_result, [name]):
     creates a FEM post processing warp filter object (vtk based)"""
     obj = doc.addObject("Fem::FemPostWarpVectorFilter", name)
-    tmp_filter_list = base_vtk_result.Filter
-    tmp_filter_list.append(obj)
-    base_vtk_result.Filter = tmp_filter_list
-    del tmp_filter_list
+    base_vtk_result.addObject(obj)
     return obj
 
 
@@ -628,23 +649,175 @@ def makePostVtkFilterContours(doc, base_vtk_result, name="VtkFilterContours"):
     """makePostVtkFilterContours(document, base_vtk_result, [name]):
     creates a FEM post processing contours filter object (vtk based)"""
     obj = doc.addObject("Fem::FemPostContoursFilter", name)
-    tmp_filter_list = base_vtk_result.Filter
-    tmp_filter_list.append(obj)
-    base_vtk_result.Filter = tmp_filter_list
-    del tmp_filter_list
+    base_vtk_result.addObject(obj)
     return obj
 
 
-def makePostVtkResult(doc, base_result, name="VtkResult"):
+def makePostFilterGlyph(doc, base_vtk_result, name="Glyph"):
+    """makePostVtkFilterGlyph(document, [name]):
+    creates a FEM post processing filter that visualizes vector fields with glyphs
+    """
+    obj = doc.addObject("Fem::PostFilterPython", name)
+    from femobjects import post_glyphfilter
+
+    post_glyphfilter.PostGlyphFilter(obj)
+    base_vtk_result.addObject(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_glyphfilter
+
+        view_post_glyphfilter.VPPostGlyphFilter(obj.ViewObject)
+    return obj
+
+
+def makePostVtkResult(doc, result_data, name="VtkResult"):
     """makePostVtkResult(document, base_result, [name]):
-    creates a FEM post processing result object (vtk based) to hold FEM results"""
+    creates a FEM post processing result data (vtk based) to hold FEM results
+    Note: Result data get expanded, it can either be single result [result] or everything
+          needed for a multistep result: [results_list, value_list, unit, description]
+    """
+
     Pipeline_Name = "Pipeline_" + name
     obj = doc.addObject("Fem::FemPostPipeline", Pipeline_Name)
-    obj.load(base_result)
+    obj.load(*result_data)
     if FreeCAD.GuiUp:
         obj.ViewObject.SelectionStyle = "BoundBox"
         # to assure the user sees something, set the default to Surface
         obj.ViewObject.DisplayMode = "Surface"
+    return obj
+
+
+def makePostLineplot(doc, name="Lineplot"):
+    """makePostLineplot(document, [name]):
+    creates a FEM post processing line plot
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_lineplot
+
+    post_lineplot.PostLineplot(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_lineplot
+
+        view_post_lineplot.VPPostLineplot(obj.ViewObject)
+    return obj
+
+
+def makePostLineplotFieldData(doc, name="FieldData2D"):
+    """makePostLineplotFieldData(document, [name]):
+    creates a FEM post processing data extractor for 2D Field data
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_lineplot
+
+    post_lineplot.PostLineplotFieldData(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_lineplot
+
+        view_post_lineplot.VPPostLineplotFieldData(obj.ViewObject)
+    return obj
+
+
+def makePostLineplotIndexOverFrames(doc, name="IndexOverFrames2D"):
+    """makePostLineplotIndexOverFrames(document, [name]):
+    creates a FEM post processing data extractor for 2D index data
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_lineplot
+
+    post_lineplot.PostLineplotIndexOverFrames(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_lineplot
+
+        view_post_lineplot.VPPostLineplotIndexOverFrames(obj.ViewObject)
+    return obj
+
+
+def makePostHistogram(doc, name="Histogram"):
+    """makePostHistogram(document, [name]):
+    creates a FEM post processing histogram plot
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_histogram
+
+    post_histogram.PostHistogram(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_histogram
+
+        view_post_histogram.VPPostHistogram(obj.ViewObject)
+    return obj
+
+
+def makePostHistogramFieldData(doc, name="FieldData1D"):
+    """makePostHistogramFieldData(document, [name]):
+    creates a FEM post processing data extractor for 1D Field data
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_histogram
+
+    post_histogram.PostHistogramFieldData(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_histogram
+
+        view_post_histogram.VPPostHistogramFieldData(obj.ViewObject)
+    return obj
+
+
+def makePostHistogramIndexOverFrames(doc, name="IndexOverFrames1D"):
+    """makePostHistogramIndexOverFrames(document, [name]):
+    creates a FEM post processing data extractor for 1D Field data
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_histogram
+
+    post_histogram.PostHistogramIndexOverFrames(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_histogram
+
+        view_post_histogram.VPPostHistogramIndexOverFrames(obj.ViewObject)
+    return obj
+
+
+def makePostTable(doc, name="Table"):
+    """makePostTable(document, [name]):
+    creates a FEM post processing histogram plot
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_table
+
+    post_table.PostTable(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_table
+
+        view_post_table.VPPostTable(obj.ViewObject)
+    return obj
+
+
+def makePostTableFieldData(doc, name="FieldData1D"):
+    """makePostTableFieldData(document, [name]):
+    creates a FEM post processing data extractor for 1D Field data
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_table
+
+    post_table.PostTableFieldData(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_table
+
+        view_post_table.VPPostTableFieldData(obj.ViewObject)
+    return obj
+
+
+def makePostTableIndexOverFrames(doc, name="IndexOverFrames1D"):
+    """makePostTableIndexOverFrames(document, [name]):
+    creates a FEM post processing data extractor for 1D Field data
+    """
+    obj = doc.addObject("Fem::FeaturePython", name)
+    from femobjects import post_table
+
+    post_table.PostTableIndexOverFrames(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_post_table
+
+        view_post_table.VPPostTableIndexOverFrames(obj.ViewObject)
     return obj
 
 
@@ -748,6 +921,17 @@ def makeEquationMagnetodynamic2D(doc, base_solver=None, name="Magnetodynamic2D")
     return obj
 
 
+def makeEquationStaticCurrent(doc, base_solver=None, name="StaticCurrent"):
+    """makeEquationStaticCurrent(document, [base_solver], [name]):
+    creates a FEM static current equation for a solver"""
+    from femsolver.elmer.equations import staticcurrent
+
+    obj = staticcurrent.create(doc, name)
+    if base_solver:
+        base_solver.addObject(obj)
+    return obj
+
+
 def makeSolverCalculiXCcxTools(doc, name="SolverCcxTools"):
     """makeSolverCalculiXCcxTools(document, [name]):
     makes a Calculix solver object for the ccx tools module"""
@@ -762,12 +946,17 @@ def makeSolverCalculiXCcxTools(doc, name="SolverCcxTools"):
     return obj
 
 
-def makeSolverCalculix(doc, name="SolverCalculix"):
-    """makeSolverCalculix(document, [name]):
+def makeSolverCalculiX(doc, name="SolverCalculiX"):
+    """makeSolverCalculiX(document, [name]):
     makes a Calculix solver object"""
-    import femsolver.calculix.solver
+    obj = doc.addObject("Fem::FemSolverObjectPython", name)
+    from femobjects import solver_calculix
 
-    obj = femsolver.calculix.solver.create(doc, name)
+    solver_calculix.SolverCalculiX(obj)
+    if FreeCAD.GuiUp:
+        from femviewprovider import view_solver_calculix
+
+        view_solver_calculix.VPSolverCalculiX(obj.ViewObject)
     return obj
 
 

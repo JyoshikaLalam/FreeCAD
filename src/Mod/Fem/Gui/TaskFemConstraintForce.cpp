@@ -27,13 +27,14 @@
 #include <QAction>
 #include <QMessageBox>
 #include <TopoDS.hxx>
+#include <limits>
 #include <sstream>
 #endif
 
 #include <App/DocumentObject.h>
-#include <App/OriginFeature.h>
+#include <App/Datums.h>
 #include <Gui/Command.h>
-#include <Gui/SelectionObject.h>
+#include <Gui/Selection/SelectionObject.h>
 #include <Gui/ViewProvider.h>
 #include <Mod/Fem/App/FemConstraintForce.h>
 #include <Mod/Fem/App/FemTools.h>
@@ -61,8 +62,7 @@ TaskFemConstraintForce::TaskFemConstraintForce(ViewProviderFemConstraintForce* C
     this->groupLayout()->addWidget(proxy);
 
     // Get the feature data
-    Fem::ConstraintForce* pcConstraint =
-        static_cast<Fem::ConstraintForce*>(ConstraintView->getObject());
+    Fem::ConstraintForce* pcConstraint = ConstraintView->getObject<Fem::ConstraintForce>();
     auto force = pcConstraint->Force.getQuantityValue();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
@@ -76,7 +76,7 @@ TaskFemConstraintForce::TaskFemConstraintForce(ViewProviderFemConstraintForce* C
     // Fill data into dialog elements
     ui->spinForce->setUnit(pcConstraint->Force.getUnit());
     ui->spinForce->setMinimum(0);
-    ui->spinForce->setMaximum(FLOAT_MAX);
+    ui->spinForce->setMaximum(std::numeric_limits<float>::max());
     ui->spinForce->setValue(force);
     ui->listReferences->clear();
     for (std::size_t i = 0; i < Objects.size(); i++) {
@@ -89,7 +89,7 @@ TaskFemConstraintForce::TaskFemConstraintForce(ViewProviderFemConstraintForce* C
     ui->checkReverse->setChecked(reversed);
 
     // create a context menu for the listview of the references
-    createDeleteAction(ui->listReferences);
+    createActions(ui->listReferences);
     connect(deleteAction, &QAction::triggered, this, &TaskFemConstraintForce::onReferenceDeleted);
     connect(ui->buttonDirection,
             &QToolButton::clicked,
@@ -127,8 +127,7 @@ void TaskFemConstraintForce::addToSelection()
         QMessageBox::warning(this, tr("Selection error"), tr("Nothing selected!"));
         return;
     }
-    Fem::ConstraintForce* pcConstraint =
-        static_cast<Fem::ConstraintForce*>(ConstraintView->getObject());
+    Fem::ConstraintForce* pcConstraint = ConstraintView->getObject<Fem::ConstraintForce>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
 
@@ -141,9 +140,7 @@ void TaskFemConstraintForce::addToSelection()
         App::DocumentObject* obj = it.getObject();
         for (const auto& subName : subNames) {  // for every selected sub element
             bool addMe = true;
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subName);
-                 itr != SubElements.end();
+            for (auto itr = std::ranges::find(SubElements, subName); itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
                                  subName)) {  // for every sub element in selection that
@@ -199,8 +196,7 @@ void TaskFemConstraintForce::removeFromSelection()
         QMessageBox::warning(this, tr("Selection error"), tr("Nothing selected!"));
         return;
     }
-    Fem::ConstraintForce* pcConstraint =
-        static_cast<Fem::ConstraintForce*>(ConstraintView->getObject());
+    Fem::ConstraintForce* pcConstraint = ConstraintView->getObject<Fem::ConstraintForce>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
     std::vector<size_t> itemsToDel;
@@ -213,9 +209,7 @@ void TaskFemConstraintForce::removeFromSelection()
         const App::DocumentObject* obj = it.getObject();
 
         for (const auto& subName : subNames) {  // for every selected sub element
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subName);
-                 itr != SubElements.end();
+            for (auto itr = std::ranges::find(SubElements, subName); itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
                                  subName)) {  // for every sub element in selection that
@@ -314,14 +308,13 @@ void TaskFemConstraintForce::onButtonDirection(const bool pressed)
 
     auto link = getDirection(Gui::Selection().getSelectionEx());
     if (!link.first) {
-        QMessageBox::warning(this, tr("Wrong selection"), tr("Select an edge or a face, please."));
+        QMessageBox::warning(this, tr("Wrong selection"), tr("Select an edge or a face."));
         return;
     }
 
     try {
         std::vector<std::string> direction(1, link.second);
-        Fem::ConstraintForce* pcConstraint =
-            static_cast<Fem::ConstraintForce*>(ConstraintView->getObject());
+        Fem::ConstraintForce* pcConstraint = ConstraintView->getObject<Fem::ConstraintForce>();
 
         // update the direction
         pcConstraint->Direction.setValue(link.first, direction);
@@ -336,14 +329,13 @@ void TaskFemConstraintForce::onButtonDirection(const bool pressed)
 
 void TaskFemConstraintForce::onCheckReverse(const bool pressed)
 {
-    Fem::ConstraintForce* pcConstraint =
-        static_cast<Fem::ConstraintForce*>(ConstraintView->getObject());
+    Fem::ConstraintForce* pcConstraint = ConstraintView->getObject<Fem::ConstraintForce>();
     pcConstraint->Reversed.setValue(pressed);
 }
 
 const std::string TaskFemConstraintForce::getForce() const
 {
-    return ui->spinForce->value().getSafeUserString().toStdString();
+    return ui->spinForce->value().getSafeUserString();
 }
 
 const std::string TaskFemConstraintForce::getReferences() const
@@ -439,7 +431,7 @@ bool TaskDlgFemConstraintForce::accept()
         std::string scale = "1";
 
         if (!dirname.empty()) {
-            QString buf = QString::fromUtf8("(App.ActiveDocument.%1,[\"%2\"])");
+            QString buf = QStringLiteral("(App.ActiveDocument.%1,[\"%2\"])");
             buf = buf.arg(QString::fromStdString(dirname));
             buf = buf.arg(QString::fromStdString(dirobj));
             Gui::Command::doCommand(Gui::Command::Doc,

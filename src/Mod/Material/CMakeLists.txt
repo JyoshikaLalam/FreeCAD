@@ -10,6 +10,7 @@ SET(MaterialScripts_Files
     importFCMat.py
     MaterialEditor.py
     TestMaterialsApp.py
+    TestMaterialsGui.py
     Templatematerial.yml
 )
 
@@ -140,6 +141,7 @@ SET(MaterialLib_Files
     Resources/Materials/Standard/Thermoplast/PP-Generic.FCMat
     Resources/Materials/Standard/Thermoplast/PTFE-Generic.FCMat
     Resources/Materials/Standard/Thermoplast/PVC-Generic.FCMat
+    Resources/Materials/Standard/Thermoplast/PC-Molded.FCMat
     Resources/Materials/Standard/Wood/Wood-Generic.FCMat
 )
 
@@ -175,6 +177,7 @@ SET(AppearanceLib_Files
     Resources/Materials/Appearance/Silver.FCMat
     Resources/Materials/Appearance/Steel.FCMat
     Resources/Materials/Appearance/Stone.FCMat
+    Resources/Materials/Appearance/Wood.FCMat
 )
 
 SET(PatternLib_Files
@@ -213,20 +216,18 @@ SET(PatternLib_Files
 )
 
 SET(MachiningLib_Files
-    Resources/Materials/Machining/Aluminum-6061.FCMat
-    Resources/Materials/Machining/Aluminum-7075.FCMat
-    Resources/Materials/Machining/Aluminum-Cast.FCMat
-    Resources/Materials/Machining/Brass-Hard.FCMat
-    Resources/Materials/Machining/Brass-Medium.FCMat
-    Resources/Materials/Machining/Brass-Soft.FCMat
-    Resources/Materials/Machining/CarbonSteel.FCMat
-    Resources/Materials/Machining/HardPlastics.FCMat
-    Resources/Materials/Machining/Hardwood.FCMat
-    Resources/Materials/Machining/SoftPlastics.FCMat
-    Resources/Materials/Machining/Softwood.FCMat
-    Resources/Materials/Machining/Stainless-303.FCMat
-    Resources/Materials/Machining/Stainless-304.FCMat
-    Resources/Materials/Machining/Stainless-316.FCMat
+    Resources/Materials/Machining/AluminumCastAlloy.FCMat
+    Resources/Materials/Machining/AluminumWroughtAlloy.FCMat
+    Resources/Materials/Machining/AusteniticStainlessSteel.FCMat
+    Resources/Materials/Machining/BalsaWood.FCMat
+    Resources/Materials/Machining/GrayCastIron.FCMat
+    Resources/Materials/Machining/HardWood.FCMat
+    Resources/Materials/Machining/LowAlloySteel.FCMat
+    Resources/Materials/Machining/MalleableCastIron.FCMat
+    Resources/Materials/Machining/MildSteel.FCMat
+    Resources/Materials/Machining/MDF.FCMat
+    Resources/Materials/Machining/ParticleBoard.FCMat
+    Resources/Materials/Machining/SoftWood.FCMat
     Resources/Materials/Machining/ToolSteel.FCMat
 )
 
@@ -293,6 +294,7 @@ set(MaterialTest_Files
     materialtests/TestModels.py
     materialtests/TestMaterials.py
     materialtests/TestMaterialCreation.py
+    materialtests/TestMaterialDocument.py
     materialtests/TestMaterialFilter.py
 )
 

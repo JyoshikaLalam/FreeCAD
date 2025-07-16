@@ -26,11 +26,12 @@
 #ifndef _PreComp_
 #include <QAction>
 #include <QMessageBox>
+#include <limits>
 #include <sstream>
 #endif
 
 #include <Gui/Command.h>
-#include <Gui/SelectionObject.h>
+#include <Gui/Selection/SelectionObject.h>
 #include <Mod/Fem/App/FemConstraintPressure.h>
 #include <Mod/Part/App/PartFeature.h>
 
@@ -56,8 +57,7 @@ TaskFemConstraintPressure::TaskFemConstraintPressure(
     this->groupLayout()->addWidget(proxy);
 
     // Get the feature data
-    Fem::ConstraintPressure* pcConstraint =
-        static_cast<Fem::ConstraintPressure*>(ConstraintView->getObject());
+    Fem::ConstraintPressure* pcConstraint = ConstraintView->getObject<Fem::ConstraintPressure>();
 
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
@@ -65,7 +65,7 @@ TaskFemConstraintPressure::TaskFemConstraintPressure(
     // Fill data into dialog elements
     ui->if_pressure->setUnit(pcConstraint->Pressure.getUnit());
     ui->if_pressure->setMinimum(0);
-    ui->if_pressure->setMaximum(FLOAT_MAX);
+    ui->if_pressure->setMaximum(std::numeric_limits<float>::max());
     ui->if_pressure->setValue(pcConstraint->Pressure.getQuantityValue());
     ui->if_pressure->bind(pcConstraint->Pressure);
 
@@ -81,7 +81,7 @@ TaskFemConstraintPressure::TaskFemConstraintPressure(
     }
 
     // create a context menu for the listview of the references
-    createDeleteAction(ui->lw_references);
+    createActions(ui->lw_references);
     connect(deleteAction,
             &QAction::triggered,
             this,
@@ -120,8 +120,7 @@ void TaskFemConstraintPressure::updateUI()
 
 void TaskFemConstraintPressure::onCheckReverse(const bool pressed)
 {
-    Fem::ConstraintPressure* pcConstraint =
-        static_cast<Fem::ConstraintPressure*>(ConstraintView->getObject());
+    Fem::ConstraintPressure* pcConstraint = ConstraintView->getObject<Fem::ConstraintPressure>();
     pcConstraint->Reversed.setValue(pressed);
 }
 
@@ -133,8 +132,7 @@ void TaskFemConstraintPressure::addToSelection()
         QMessageBox::warning(this, tr("Selection error"), tr("Nothing selected!"));
         return;
     }
-    Fem::ConstraintPressure* pcConstraint =
-        static_cast<Fem::ConstraintPressure*>(ConstraintView->getObject());
+    Fem::ConstraintPressure* pcConstraint = ConstraintView->getObject<Fem::ConstraintPressure>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
 
@@ -152,9 +150,7 @@ void TaskFemConstraintPressure::addToSelection()
                 QMessageBox::warning(this, tr("Selection error"), tr("Only faces can be picked"));
                 return;
             }
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subName);
-                 itr != SubElements.end();
+            for (auto itr = std::ranges::find(SubElements, subName); itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
                                  subName)) {  // for every sub element in selection that
@@ -188,8 +184,7 @@ void TaskFemConstraintPressure::removeFromSelection()
         QMessageBox::warning(this, tr("Selection error"), tr("Nothing selected!"));
         return;
     }
-    Fem::ConstraintPressure* pcConstraint =
-        static_cast<Fem::ConstraintPressure*>(ConstraintView->getObject());
+    Fem::ConstraintPressure* pcConstraint = ConstraintView->getObject<Fem::ConstraintPressure>();
     std::vector<App::DocumentObject*> Objects = pcConstraint->References.getValues();
     std::vector<std::string> SubElements = pcConstraint->References.getSubValues();
     std::vector<size_t> itemsToDel;
@@ -202,9 +197,7 @@ void TaskFemConstraintPressure::removeFromSelection()
         const App::DocumentObject* obj = it.getObject();
 
         for (const auto& subName : subNames) {  // for every selected sub element
-            for (std::vector<std::string>::iterator itr =
-                     std::find(SubElements.begin(), SubElements.end(), subName);
-                 itr != SubElements.end();
+            for (auto itr = std::ranges::find(SubElements, subName); itr != SubElements.end();
                  itr = std::find(++itr,
                                  SubElements.end(),
                                  subName)) {  // for every sub element in selection that
@@ -219,7 +212,7 @@ void TaskFemConstraintPressure::removeFromSelection()
             }
         }
     }
-    std::sort(itemsToDel.begin(), itemsToDel.end());
+    std::ranges::sort(itemsToDel);
     while (!itemsToDel.empty()) {
         Objects.erase(Objects.begin() + itemsToDel.back());
         SubElements.erase(SubElements.begin() + itemsToDel.back());
@@ -254,7 +247,7 @@ const std::string TaskFemConstraintPressure::getReferences() const
 
 std::string TaskFemConstraintPressure::getPressure() const
 {
-    return ui->if_pressure->value().getSafeUserString().toStdString();
+    return ui->if_pressure->value().getSafeUserString();
 }
 
 bool TaskFemConstraintPressure::getReverse() const

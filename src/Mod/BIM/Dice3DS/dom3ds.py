@@ -1,5 +1,3 @@
-# dom3ds.py
-
 """Slice and dice 3DS files.
 
 Provides for reading, writing, and manipulating 3DS files.  It's
@@ -1717,7 +1715,7 @@ class HIDE_TRACK_TAG(UndefinedChunk):
 class DUMMY(ChunkBase): tag = 0xFFFF
 
 #
-# Obsolute Chunks
+# Obsolete Chunks
 #
 
 class VIEWPORT_LAYOUT_OLD(UndefinedChunk): tag = 0x7000

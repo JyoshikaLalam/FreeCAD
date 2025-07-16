@@ -66,10 +66,6 @@
 
 using namespace Gui;
 
-#ifndef GL_MULTISAMPLE
-#define GL_MULTISAMPLE  0x809D
-#endif
-
 // http://doc.qt.digia.com/qq/qq26-openglcanvas.html
 
 GraphicsView::GraphicsView()
@@ -458,11 +454,7 @@ GraphicsScene::setNavigationModeFile(const QUrl & url)
         QFile file(QString::fromLatin1(filenametmp));
         if (file.open(QIODevice::ReadOnly)) {
             QByteArray fileContents = file.readAll();
-#if COIN_MAJOR_VERSION >= 4
             stateMachine = ScXML::readBuffer(SbByteBuffer(fileContents.size(), fileContents.constData()));
-#else
-            stateMachine = ScXML::readBuffer(fileContents.constData());
-#endif
             file.close();
         }
     }
@@ -584,7 +576,7 @@ void GraphicsScene::drawBackground(QPainter *painter, const QRectF &)
 
     painter->save();
     painter->fillRect(40,40,40,60,Qt::lightGray);
-    painter->drawText(50,50, QString::fromLatin1("Done with QPainter"));
+    painter->drawText(50,50, QStringLiteral("Done with QPainter"));
     painter->restore();
 
     QTimer::singleShot(20, this, SLOT(update()));
@@ -655,7 +647,7 @@ GraphicsView3D::GraphicsView3D(Gui::Document* doc, QWidget* parent)
     m_view->installEventFilter(m_scene->getEventFilter());
     m_view->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
     m_view->setScene(m_scene);
-    m_scene->setNavigationModeFile(QUrl(QString::fromLatin1("coin:///scxml/navigation/examiner.xml")));
+    m_scene->setNavigationModeFile(QUrl(QStringLiteral("coin:///scxml/navigation/examiner.xml")));
 
     std::vector<ViewProvider*> v = doc->getViewProvidersOfType(ViewProvider::getClassTypeId());
     SoSeparator* root = new SoSeparator();

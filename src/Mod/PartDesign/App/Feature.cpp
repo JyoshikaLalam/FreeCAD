@@ -32,11 +32,11 @@
 # include <TopoDS.hxx>
 #endif
 
+#include "App/Datums.h"
 #include <App/Document.h>
 #include <App/DocumentObject.h>
-#include <App/FeaturePythonPyImp.h>
 #include <App/ElementNamingUtils.h>
-#include "App/OriginFeature.h"
+#include <App/FeaturePythonPyImp.h>
 #include <Base/Console.h>
 
 #include "Feature.h"
@@ -49,6 +49,14 @@ FC_LOG_LEVEL_INIT("PartDesign", true, true)
 
 namespace PartDesign {
 
+bool getPDRefineModelParameter()
+{
+    Base::Reference<ParameterGrp> hGrp = App::GetApplication().GetUserParameter()
+        .GetGroup("BaseApp")->GetGroup("Preferences")->GetGroup("Mod/PartDesign");
+    return hGrp->GetBool("RefineModel", true);
+}
+
+// ------------------------------------------------------------------------------------------------
 
 PROPERTY_SOURCE(PartDesign::Feature,Part::Feature)
 
@@ -62,14 +70,12 @@ Feature::Feature()
     BaseFeature.setStatus(App::Property::Hidden, true);
 
     App::SuppressibleExtension::initExtension(this);
-#ifndef FC_USE_TNP_FIX
-    Suppressed.setStatus(App::Property::Status::Hidden, true);
-#endif
 }
 
 App::DocumentObjectExecReturn* Feature::recompute()
 {
-#ifdef FC_USE_TNP_FIX
+    setMaterialToBodyMaterial();
+
     SuppressedShape.setValue(TopoShape());
 
     if (!Suppressed.getValue()) {
@@ -88,37 +94,32 @@ App::DocumentObjectExecReturn* Feature::recompute()
     }
     catch (Base::Exception& e) {
         failed = true;
-        e.ReportException();
+        e.reportException();
         FC_ERR("Failed to recompute suppressed feature " << getFullName());
     }
+
+    Shape.setValue(getBaseTopoShape(true));
 
     if (!failed) {
         updateSuppressedShape();
     }
-    else {
-        Shape.setValue(getBaseTopoShape(true));
-    }
     return App::DocumentObject::StdReturn;
-#else
-    try {
-        auto baseShape = getBaseTopoShape();
-        if (Suppressed.getValue()) {
-            this->Shape.setValue(baseShape.getShape());
-            return StdReturn;
+}
+
+void Feature::setMaterialToBodyMaterial()
+{
+    auto body = getFeatureBody();
+    if (body) {
+        // Ensure the part has the same material as the body
+        auto feature = dynamic_cast<Part::Feature*>(body);
+        if (feature) {
+            copyMaterial(feature);
         }
     }
-    catch (Base::Exception&) {
-        //invalid BaseShape
-        Suppressed.setValue(false);
-    }
-
-    return DocumentObject::recompute();
-#endif
 }
 
 void Feature::updateSuppressedShape()
 {
-    auto baseShape = getBaseTopoShape(true);
     TopoShape res(getID());
     TopoShape shape = Shape.getShape();
     shape.setPlacement(Base::Placement());
@@ -136,7 +137,6 @@ void Feature::updateSuppressedShape()
         res.makeElementCompound(generated);
         res.setPlacement(Placement.getValue());
     }
-    Shape.setValue(baseShape);
     SuppressedShape.setValue(res);
 }
 
@@ -147,28 +147,7 @@ short Feature::mustExecute() const
     return Part::Feature::mustExecute();
 }
 
-// TODO: Toponaming April 2024 Deprecated in favor of TopoShape method.  Remove when possible.
-TopoDS_Shape Feature::getSolid(const TopoDS_Shape& shape)
-{
-    if (shape.IsNull()) {
-        Standard_Failure::Raise("Shape is null");
-    }
-
-    // If single solid rule is not enforced  we simply return the shape as is
-    if (singleSolidRuleMode() != Feature::SingleSolidRuleMode::Enforced) {
-        return shape;
-    }
-
-    TopExp_Explorer xp;
-    xp.Init(shape, TopAbs_SOLID);
-    if (xp.More()) {
-        return xp.Current();
-    }
-
-    return {};
-}
-
-TopoShape Feature::getSolid(const TopoShape& shape)
+TopoShape Feature::getSolid(const TopoShape& shape) const
 {
     if (shape.isNull()) {
         throw Part::NullShapeException("Null shape");
@@ -206,6 +185,21 @@ void Feature::onChanged(const App::Property *prop)
                         body->insertObject(BaseFeature.getValue(), this);
                 }
             }
+        } else if (prop == &ShapeMaterial) {
+            auto body = Body::findBodyOf(this);
+            if (body) {
+                if (body->ShapeMaterial.getValue().getUUID()
+                    != ShapeMaterial.getValue().getUUID()) {
+                    body->ShapeMaterial.setValue(ShapeMaterial.getValue());
+                }
+            }
+        } else if (prop == &Suppressed){
+            if (Suppressed.getValue()) {
+                SuppressedPlacement = Placement.getValue();
+            } else {
+                Placement.setValue(SuppressedPlacement);
+                SuppressedPlacement = Base::Placement();
+            }
         }
     }
     Part::Feature::onChanged(prop);
@@ -236,7 +230,7 @@ bool Feature::isSingleSolidRuleSatisfied(const TopoDS_Shape& shape, TopAbs_Shape
 }
 
 
-Feature::SingleSolidRuleMode Feature::singleSolidRuleMode()
+Feature::SingleSolidRuleMode Feature::singleSolidRuleMode() const
 {
     auto body = getFeatureBody();
 
@@ -295,8 +289,8 @@ const TopoDS_Shape& Feature::getBaseShape() const {
     if (!BaseObject)
         throw Base::ValueError("Base feature's shape is not defined");
 
-    if (BaseObject->isDerivedFrom(PartDesign::ShapeBinder::getClassTypeId())||
-        BaseObject->isDerivedFrom(PartDesign::SubShapeBinder::getClassTypeId()))
+    if (BaseObject->isDerivedFrom<PartDesign::ShapeBinder>()||
+        BaseObject->isDerivedFrom<PartDesign::SubShapeBinder>())
     {
         throw Base::ValueError("Base shape of shape binder cannot be used");
     }
@@ -328,8 +322,8 @@ Part::TopoShape Feature::getBaseTopoShape(bool silent) const
             }
             throw Base::RuntimeError("Missing container body");
         }
-        if (BaseObject->isDerivedFrom(PartDesign::ShapeBinder::getClassTypeId())
-            || BaseObject->isDerivedFrom(PartDesign::SubShapeBinder::getClassTypeId())) {
+        if (BaseObject->isDerivedFrom<PartDesign::ShapeBinder>()
+            || BaseObject->isDerivedFrom<PartDesign::SubShapeBinder>()) {
             if (silent) {
                 return result;
             }
@@ -360,7 +354,7 @@ PyObject* Feature::getPyObject()
 
 bool Feature::isDatum(const App::DocumentObject* feature)
 {
-    return feature->isDerivedFrom<App::OriginFeature>() ||
+    return feature->isDerivedFrom<App::DatumElement>() ||
            feature->isDerivedFrom<Part::Datum>();
 }
 
@@ -399,13 +393,13 @@ TopoShape Feature::makeTopoShapeFromPlane(const App::DocumentObject* obj)
 
 Body* Feature::getFeatureBody() const {
 
-    auto body = Base::freecad_dynamic_cast<Body>(_Body.getValue());
+    auto body = freecad_cast<Body*>(_Body.getValue());
     if(body)
         return body;
 
     auto list = getInList();
     for (auto in : list) {
-        if(in->isDerivedFrom(Body::getClassTypeId()) && //is Body?
+        if(in->isDerivedFrom<Body>() && //is Body?
            static_cast<Body*>(in)->hasObject(this)) {    //is part of this Body?
 
                return static_cast<Body*>(in);
@@ -415,7 +409,7 @@ Body* Feature::getFeatureBody() const {
     return nullptr;
 }
 
-App::DocumentObject *Feature::getSubObject(const char *subname, 
+App::DocumentObject *Feature::getSubObject(const char *subname,
         PyObject **pyObj, Base::Matrix4D *pmat, bool transform, int depth) const
 {
     if (subname && subname != Data::findElementName(subname)) {
@@ -440,7 +434,7 @@ App::DocumentObject *Feature::getSubObject(const char *subname,
                         // an inverse transform.
                         _mat = Placement.getValue().inverse().toMatrix();
                         if (pmat)
-                            *pmat *= _mat; 
+                            *pmat *= _mat;
                         else
                             pmat = &_mat;
                     }

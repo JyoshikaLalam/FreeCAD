@@ -51,6 +51,7 @@ public:
     std::map<App::ObjectIdentifier, const App::Expression*> getExpressions() const override;
     void setExpressions(std::map<App::ObjectIdentifier, App::ExpressionPtr>&& exprs) override;
     void onRelabeledDocument(const App::Document& doc) override;
+    void onRenameDynamicProperty(const App::Property& prop, const char* oldName) override;
 
     void updateElementReference(App::DocumentObject* feature,
                                 bool reverse = false,
@@ -98,9 +99,9 @@ public:
 
     void setStyle(App::CellAddress address, const std::set<std::string>& _style);
 
-    void setForeground(App::CellAddress address, const App::Color& color);
+    void setForeground(App::CellAddress address, const Base::Color& color);
 
-    void setBackground(App::CellAddress address, const App::Color& color);
+    void setBackground(App::CellAddress address, const Base::Color& color);
 
     void setDisplayUnit(App::CellAddress address, const std::string& unit);
 
@@ -123,6 +124,9 @@ public:
     const Cell* getValueFromAlias(const std::string& alias) const;
 
     bool isValidAlias(const std::string& candidate);
+
+    // checks whether candidate is of form A1, C4, etc.
+    bool isValidCellAddressName(const std::string& candidate);
 
     std::vector<App::CellAddress> getUsedCells() const;
 

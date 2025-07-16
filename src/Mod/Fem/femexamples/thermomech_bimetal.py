@@ -159,6 +159,7 @@ def setup(doc=None, solvertype="ccxtools"):
     mat["SpecificHeat"] = "385 J/kg/K"
     mat["ThermalConductivity"] = "398 W/m/K"
     mat["ThermalExpansionCoefficient"] = "0.0000165 m/m/K"
+    mat["ThermalExpansionReferenceTemperature"] = "273 K"
     mat["Density"] = "8960.0 kg/m^3"
     material_obj_bottom.Material = mat
     material_obj_bottom.References = [(geom_obj, "Solid1")]
@@ -173,6 +174,7 @@ def setup(doc=None, solvertype="ccxtools"):
     mat["SpecificHeat"] = "515 J/kg/K"
     mat["ThermalConductivity"] = "13.5 W/m/K"
     mat["ThermalExpansionCoefficient"] = "0.00000125 m/m/K"
+    mat["ThermalExpansionReferenceTemperature"] = "273 K"
     material_obj_top.Material = mat
     material_obj_top.References = [(geom_obj, "Solid2")]
     analysis.addObject(material_obj_top)
@@ -215,7 +217,7 @@ def setup(doc=None, solvertype="ccxtools"):
         FreeCAD.Console.PrintError("Error on creating elements.\n")
     femmesh_obj = analysis.addObject(ObjectsFem.makeMeshGmsh(doc, get_meshname()))[0]
     femmesh_obj.FemMesh = fem_mesh
-    femmesh_obj.Part = geom_obj
+    femmesh_obj.Shape = geom_obj
     femmesh_obj.SecondOrderLinear = False
 
     doc.recompute()

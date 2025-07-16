@@ -51,7 +51,7 @@ def makeInvoluteGear(name):
     return obj
 
 
-class _CommandInvoluteGear:
+class CommandInvoluteGear:
     "GUI command to create an InvoluteGear"
     def GetResources(self):
         return {'Pixmap'  : 'PartDesign_InternalExternalGear',
@@ -86,7 +86,7 @@ class _InvoluteGear:
     def _ensure_properties(self, obj, is_restore):
         def ensure_property(type_, name, doc, default):
             if not hasattr(obj, name):
-                obj.addProperty(type_, name, "Gear", doc)
+                obj.addProperty(type_, name, "Gear", doc, locked=True)
                 if callable(default):
                     setattr(obj, name, default())
                 else:
@@ -277,7 +277,3 @@ class _InvoluteGearTaskPanel:
     def reject(self):
         FreeCADGui.ActiveDocument.resetEdit()
         FreeCAD.ActiveDocument.abortTransaction()
-
-
-if FreeCAD.GuiUp:
-    FreeCADGui.addCommand('PartDesign_InvoluteGear',_CommandInvoluteGear())

@@ -25,7 +25,10 @@
 #include <QMessageBox>
 #endif
 
+#include <Gui/Application.h>
+#include <Gui/Command.h>
 #include <Gui/MainWindow.h>
+#include <Gui/Tools.h>
 
 #include <Mod/Material/App/Exceptions.h>
 #include <Mod/Material/App/Materials.h>
@@ -56,12 +59,12 @@ Array2D::Array2D(const QString& propertyName,
         _property = material->getAppearanceProperty(propertyName);
     }
     else {
-        Base::Console().Log("Property '%s' not found\n", propertyName.toStdString().c_str());
+        Base::Console().log("Property '%s' not found\n", propertyName.toStdString().c_str());
         _property = nullptr;
     }
     if (_property) {
         _value =
-            std::static_pointer_cast<Materials::Material2DArray>(_property->getMaterialValue());
+            std::static_pointer_cast<Materials::Array2D>(_property->getMaterialValue());
         setWindowTitle(_property->getDisplayName());
     }
     else {
@@ -74,7 +77,8 @@ Array2D::Array2D(const QString& propertyName,
     connect(ui->tableView, &QWidget::customContextMenuRequested, this, &Array2D::onContextMenu);
 
     _deleteAction.setText(tr("Delete row"));
-    _deleteAction.setShortcut(QKeySequence::Delete);
+    _deleteAction.setShortcut(Gui::QtTools::deleteKeySequence());
+
     connect(&_deleteAction, &QAction::triggered, this, &Array2D::onDelete);
     ui->tableView->addAction(&_deleteAction);
 
