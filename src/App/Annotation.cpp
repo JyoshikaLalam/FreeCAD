@@ -51,3 +51,4 @@ AnnotationLabel::AnnotationLabel()
 }
 
 AnnotationLabel::~AnnotationLabel() = default;
+
